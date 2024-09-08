@@ -1,0 +1,112 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  telegramId   String   @unique
+  username     String?
+  firstName    String?
+  lastName     String?
+  isSubscribed Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  articles     Article[]
+  airdropTasks UserAirdrop[]
+  referrals    Referral[]
+}
+
+model Article {
+  id          Int               @id @default(autoincrement())
+  title       String
+  content     String
+  isActive    Boolean           @default(true)
+  publishDate DateTime?
+  createdBy   Int
+  author      User              @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  categories  ArticleCategory[]
+}
+
+model Airdrop {
+  id           Int           @id @default(autoincrement())
+  name         String
+  description  String
+  isActive     Boolean       @default(true)
+  startDate    DateTime
+  endDate      DateTime
+  prizePool    Float
+  tasks        Task[]
+  participants UserAirdrop[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String
+  isCompleted Boolean @default(false)
+  airdropId   Int
+  airdrop     Airdrop @relation(fields: [airdropId], references: [id])
+}
+
+model UserAirdrop {
+  userId         Int
+  airdropId      Int
+  tasksCompleted Int     @default(0)
+  referredUsers  Int     @default(0)
+  user           User    @relation(fields: [userId], references: [id])
+  airdrop        Airdrop @relation(fields: [airdropId], references: [id])
+
+  @@id([userId, airdropId])
+}
+
+model Category {
+  id          Int               @id @default(autoincrement())
+  name        String
+  description String
+  articles    ArticleCategory[]
+}
+
+model ArticleCategory {
+  articleId  Int
+  categoryId Int
+  article    Article  @relation(fields: [articleId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@id([articleId, categoryId])
+}
+
+model Referral {
+  id           Int      @id @default(autoincrement())
+  referralLink String
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Advertisement {
+  id          Int      @id @default(autoincrement())
+  imageUrl    String
+  redirectUrl String
+  isActive    Boolean  @default(true)
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime @default(now())
+}
+
