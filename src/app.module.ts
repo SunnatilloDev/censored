@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule as ConfigModuleFromNest } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { ConfigModule } from './config/config.module';
 import { CategoriesService } from './categories/categories.service';
 import { AirdropsService } from './airdrops/airdrops.service';
 import { ArticlesService } from './articles/articles.service';
@@ -17,6 +16,14 @@ import { CategoriesModule } from './categories/categories.module';
 import { AirdropsModule } from './airdrops/airdrops.module';
 import { ArticlesModule } from './articles/articles.module';
 import { UsersModule } from './users/users.module';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { BotModule } from './bot/bot.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { NotificationsService } from 'src/notifications/notifications.service';
+import { ReferralModule } from './referral/referral.module';
+import { AdvertisementService } from './advertisement/advertisement.service';
+import { AdvertisementModule } from './advertisement/advertisement.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -28,8 +35,12 @@ import { UsersModule } from './users/users.module';
     ArticlesModule,
     AirdropsModule,
     CategoriesModule,
-    ConfigModule,
     PrismaModule,
+    BotModule,
+    NotificationsModule,
+    ReferralModule,
+    AdvertisementModule,
+    TagsModule,
   ],
   controllers: [
     AuthController,
@@ -44,6 +55,10 @@ import { UsersModule } from './users/users.module';
     ArticlesService,
     AirdropsService,
     CategoriesService,
+    PrismaService,
+    NotificationsService,
+    AdvertisementService,
+    
   ],
 })
 export class AppModule {}

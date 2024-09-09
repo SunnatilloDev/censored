@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Airdrop" ADD COLUMN     "views" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Article" ADD COLUMN     "views" INTEGER NOT NULL DEFAULT 0;

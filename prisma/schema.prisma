@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,18 +8,20 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  telegramId   String   @unique
+  id           Int           @id @default(autoincrement())
+  telegramId   String        @unique
   username     String?
   firstName    String?
   lastName     String?
-  isSubscribed Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
+  isSubscribed Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   articles     Article[]
   airdropTasks UserAirdrop[]
-  referrals    Referral[]
+  referrals    Referral[]    @relation("Referrer")
+  referredBy   Referral?     @relation("Referred")
+  ArticleView  ArticleView[]
+  AirdropView  AirdropView[]
 }
 
 model Article {
@@ -33,12 +29,15 @@ model Article {
   title       String
   content     String
   isActive    Boolean           @default(true)
+  views       Int               @default(0)
   publishDate DateTime?
   createdBy   Int
   author      User              @relation(fields: [createdBy], references: [id])
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   categories  ArticleCategory[]
+  tags        ArticleTag[]
+  ArticleView ArticleView[]
 }
 
 model Airdrop {
@@ -46,14 +45,16 @@ model Airdrop {
   name         String
   description  String
   isActive     Boolean       @default(true)
+  views        Int           @default(0)
   startDate    DateTime
   endDate      DateTime
   prizePool    Float
   tasks        Task[]
   participants UserAirdrop[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  AirdropView AirdropView[]
 }
 
 model Task {
@@ -68,10 +69,12 @@ model Task {
 model UserAirdrop {
   userId         Int
   airdropId      Int
-  tasksCompleted Int     @default(0)
-  referredUsers  Int     @default(0)
-  user           User    @relation(fields: [userId], references: [id])
-  airdrop        Airdrop @relation(fields: [airdropId], references: [id])
+  tasksCompleted Int      @default(0)
+  referredUsers  Int      @default(0)
+  user           User     @relation(fields: [userId], references: [id])
+  airdrop        Airdrop  @relation(fields: [airdropId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@id([userId, airdropId])
 }
@@ -79,7 +82,7 @@ model UserAirdrop {
 model Category {
   id          Int               @id @default(autoincrement())
   name        String
-  description String
+  description String?
   articles    ArticleCategory[]
 }
 
@@ -92,11 +95,29 @@ model ArticleCategory {
   @@id([articleId, categoryId])
 }
 
+model Tag {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?
+  articles    ArticleTag[]
+}
+
+model ArticleTag {
+  articleId Int
+  tagId     Int
+  article   Article @relation(fields: [articleId], references: [id])
+  tag       Tag     @relation(fields: [tagId], references: [id])
+
+  @@id([articleId, tagId])
+}
+
 model Referral {
   id           Int      @id @default(autoincrement())
-  referralLink String
-  userId       Int
-  user         User     @relation(fields: [userId], references: [id])
+  referralLink String   @unique
+  referrerId   Int
+  referredId   Int?     @unique
+  referrer     User     @relation("Referrer", fields: [referrerId], references: [id])
+  referred     User?    @relation("Referred", fields: [referredId], references: [id])
   createdAt    DateTime @default(now())
 }
 
@@ -105,8 +126,30 @@ model Advertisement {
   imageUrl    String
   redirectUrl String
   isActive    Boolean  @default(true)
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
   startDate   DateTime
   endDate     DateTime
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
+model ArticleView {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  articleId Int
+  user      User    @relation(fields: [userId], references: [id])
+  article   Article @relation(fields: [articleId], references: [id])
+
+  @@unique([userId, articleId]) // Ensure a user can only view an article once
+}
+
+model AirdropView {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  airdropId Int
+  user      User    @relation(fields: [userId], references: [id])
+  airdrop   Airdrop @relation(fields: [airdropId], references: [id])
+
+  @@unique([userId, airdropId]) // Ensure a user can only view an airdrop once
+}
