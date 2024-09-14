@@ -25,11 +25,14 @@ export class ArticlesController {
     @Param('id') articleId: string,
     @Query('userId') userId: number,
   ) {
-    return await this.articleService.getArticle(articleId, userId);
+    return await this.articleService.getArticle(articleId, Number(userId));
   }
 
   @Put(':id')
-  async updateArticle(@Param('id') articleId: string, @Body() updateData: UpdateArticleDto) {
+  async updateArticle(
+    @Param('id') articleId: string,
+    @Body() updateData: UpdateArticleDto,
+  ) {
     return await this.articleService.updateArticle(articleId, updateData);
   }
 
