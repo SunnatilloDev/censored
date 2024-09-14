@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger'
 import {
   IsBoolean,
   IsDateString,
@@ -9,26 +9,16 @@ import {
 
 export class CreateArticleDto {
   @ApiProperty()
-  @IsString()
   title: string;
-
   @ApiProperty()
-  @IsString()
+  subtitle: string;
+  @ApiProperty()
   content: string;
-
   @ApiProperty()
-  @IsNumber()
+  @IsOptional()
+  conclusion: string;
+  @ApiProperty()
   createdBy: number;
-
-  @ApiProperty()
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
-
-  @ApiProperty()
-  @IsDateString()
-  @IsOptional()
-  publishDate?: string;
 }
 
 export class UpdateArticleDto {

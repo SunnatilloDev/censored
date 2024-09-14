@@ -48,17 +48,19 @@ export class ArticlesService {
 
   async createArticle(articleData: CreateArticleDto) {
     try {
-      const authorExists = await this.prisma.user.findFirst({
+      const authorExists = await this.prisma.user.findUnique({
         where: { id: articleData.createdBy },
       });
+      console.log(authorExists);
+
       if (!authorExists) {
         throw new BadRequestException('The author must be a valid user ID.');
       }
       return await this.prisma.article.create({
-        data: articleData,
+        data: { ...articleData },
       });
     } catch (error) {
-      if(error instanceof BadRequestException) {
+      if (error instanceof BadRequestException) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to create article.');

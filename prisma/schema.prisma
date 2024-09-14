@@ -13,6 +13,7 @@ model User {
   username     String?
   firstName    String?
   lastName     String?
+  profilePic   String?
   isSubscribed Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -25,12 +26,12 @@ model User {
 }
 
 model Article {
-  id          Int               @id @default(autoincrement())
-  title       String
-  content     String
-  isActive    Boolean           @default(true)
-  views       Int               @default(0)
-  publishDate DateTime?
+  id         Int     @id @default(autoincrement())
+  title      String
+  subtitle   String
+  content    String
+  conclusion String?
+  views      Int     @default(0)
   createdBy   Int
   author      User              @relation(fields: [createdBy], references: [id])
   createdAt   DateTime          @default(now())
@@ -51,7 +52,6 @@ model Airdrop {
   prizePool    Float
   tasks        Task[]
   participants UserAirdrop[]
-
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   AirdropView AirdropView[]
