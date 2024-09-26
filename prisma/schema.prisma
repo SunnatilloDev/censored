@@ -8,53 +8,38 @@ datasource db {
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  telegramId   String        @unique
-  username     String?
-  firstName    String?
-  lastName     String?
-  profilePic   String?
-  isSubscribed Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  articles     Article[]
-  airdropTasks UserAirdrop[]
-  referrals    Referral[]    @relation("Referrer")
-  referredBy   Referral?     @relation("Referred")
-  ArticleView  ArticleView[]
-  AirdropView  AirdropView[]
-}
-
-model Article {
-  id         Int     @id @default(autoincrement())
-  title      String
-  subtitle   String
-  content    String
-  conclusion String?
-  views      Int     @default(0)
-  createdBy   Int
-  author      User              @relation(fields: [createdBy], references: [id])
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  categories  ArticleCategory[]
-  tags        ArticleTag[]
-  ArticleView ArticleView[]
+  id            Int             @id @default(autoincrement())
+  telegramId    String          @unique
+  username      String?
+  firstName     String?
+  lastName      String?
+  isSubscribed  Boolean         @default(false)
+  photo_url     String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  airdrops      UserAirdrop[]
+  referrals     Referral[]      @relation("Referrer")
+  referredBy    Referral?       @relation("Referred")
+  articles      Article[]
+  ArticleView   ArticleView[]
+  AirdropView   AirdropView[]
+  ArticleRating ArticleRating[]
 }
 
 model Airdrop {
   id           Int           @id @default(autoincrement())
   name         String
   description  String
-  isActive     Boolean       @default(true)
-  views        Int           @default(0)
   startDate    DateTime
   endDate      DateTime
+  isActive     Boolean       @default(true)
   prizePool    Float
   tasks        Task[]
   participants UserAirdrop[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  AirdropView AirdropView[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  Referral     Referral[]
+  AirdropView  AirdropView[]
 }
 
 model Task {
@@ -69,14 +54,67 @@ model Task {
 model UserAirdrop {
   userId         Int
   airdropId      Int
-  tasksCompleted Int      @default(0)
-  referredUsers  Int      @default(0)
-  user           User     @relation(fields: [userId], references: [id])
-  airdrop        Airdrop  @relation(fields: [airdropId], references: [id])
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  tasksCompleted Int     @default(0)
+  referredUsers  Int     @default(0)
+  user           User    @relation(fields: [userId], references: [id])
+  airdrop        Airdrop @relation(fields: [airdropId], references: [id])
 
   @@id([userId, airdropId])
+}
+
+model Referral {
+  id           Int      @id @default(autoincrement())
+  referralLink String   @unique
+  referrerId   Int
+  referredId   Int?     @unique
+  airdropId    Int
+  referrer     User     @relation("Referrer", fields: [referrerId], references: [id])
+  referred     User?    @relation("Referred", fields: [referredId], references: [id])
+  airdrop      Airdrop  @relation(fields: [airdropId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model Article {
+  id            Int               @id @default(autoincrement())
+  title         String
+  subtitle      String?
+  content       String
+  isActive      Boolean           @default(true)
+  conclusion    String?
+  publishDate   DateTime?
+  authorId      Int?
+  author        User?             @relation(fields: [authorId], references: [id])
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  categories    ArticleCategory[]
+  ArticleTag    ArticleTag[]
+  ArticleView   ArticleView[]
+  status        String            @default("Draft")
+  views         Int               @default(0)
+  ArticleMedia  ArticleMedia[]
+  averageRating Float             @default(0)
+  totalRatings  Int               @default(0)
+  ArticleRating ArticleRating[]
+}
+
+model ArticleRating {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  articleId Int
+  rating    Int
+  user      User    @relation(fields: [userId], references: [id])
+  article   Article @relation(fields: [articleId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, articleId])
+}
+
+model ArticleMedia {
+  id        Int     @id @default(autoincrement())
+  articleId Int
+  imageUrl  String
+  article   Article @relation(fields: [articleId], references: [id])
 }
 
 model Category {
@@ -87,12 +125,26 @@ model Category {
 }
 
 model ArticleCategory {
+  id         Int      @id @default(autoincrement())
   articleId  Int
   categoryId Int
   article    Article  @relation(fields: [articleId], references: [id])
   category   Category @relation(fields: [categoryId], references: [id])
 
-  @@id([articleId, categoryId])
+  @@unique([articleId, categoryId])
+}
+
+model Advertisement {
+  id          Int      @id @default(autoincrement())
+  imageUrl    String
+  redirectUrl String
+  isActive    Boolean  @default(true)
+  startDate   DateTime
+  endDate     DateTime
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Tag {
@@ -111,45 +163,20 @@ model ArticleTag {
   @@id([articleId, tagId])
 }
 
-model Referral {
-  id           Int      @id @default(autoincrement())
-  referralLink String   @unique
-  referrerId   Int
-  referredId   Int?     @unique
-  referrer     User     @relation("Referrer", fields: [referrerId], references: [id])
-  referred     User?    @relation("Referred", fields: [referredId], references: [id])
-  createdAt    DateTime @default(now())
-}
-
-model Advertisement {
-  id          Int      @id @default(autoincrement())
-  imageUrl    String
-  redirectUrl String
-  isActive    Boolean  @default(true)
-  clicks      Int      @default(0)
-  impressions Int      @default(0)
-  startDate   DateTime
-  endDate     DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
 model ArticleView {
-  id        Int     @id @default(autoincrement())
   userId    Int
   articleId Int
   user      User    @relation(fields: [userId], references: [id])
   article   Article @relation(fields: [articleId], references: [id])
 
-  @@unique([userId, articleId]) // Ensure a user can only view an article once
+  @@id([userId, articleId])
 }
 
 model AirdropView {
-  id        Int     @id @default(autoincrement())
   userId    Int
   airdropId Int
   user      User    @relation(fields: [userId], references: [id])
   airdrop   Airdrop @relation(fields: [airdropId], references: [id])
 
-  @@unique([userId, airdropId]) // Ensure a user can only view an airdrop once
+  @@id([userId, airdropId])
 }

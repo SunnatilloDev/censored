@@ -1,0 +1,52 @@
+import {
+  Injectable,
+  NestMiddleware,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Response, NextFunction } from 'express';
+import { PrismaService } from 'src/prisma/prisma.service';
+import * as jwt from 'jsonwebtoken';
+import { CreateUserDto } from 'src/users/dto/index';
+import { IncomingHttpHeaders } from 'http';
+
+interface Request {
+  user?: CreateUserDto;
+  headers: IncomingHttpHeaders;
+}
+@Injectable()
+export class AuthMiddleware implements NestMiddleware {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async use(req: Request, res: Response, next: NextFunction) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      throw new UnauthorizedException('No token provided');
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException('Invalid token format');
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      const userId = decoded.id;
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      req.user = user;
+    } catch (error) {
+      console.error('Authentication error:', error);
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+  }
+}

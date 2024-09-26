@@ -17,7 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "db:push": "prisma migrate dev --name push"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -33,6 +34,7 @@
     "dotenv": "^16.4.5",
     "generate-unique-id": "^2.0.3",
     "grammy": "^1.30.0",
+    "jsonwebtoken": "^9.0.2",
     "prisma": "^5.19.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",

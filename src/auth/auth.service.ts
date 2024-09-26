@@ -17,6 +17,7 @@ export class AuthService {
         username,
         first_name: firstName,
         last_name: lastName,
+        photo_url,
       } = telegramData;
 
       const isSubscribed = await this.checkSubscription(telegramId);
@@ -27,12 +28,19 @@ export class AuthService {
 
       const user = await this.prisma.user.upsert({
         where: { telegramId },
-        update: { username, firstName, lastName, isSubscribed: true },
+        update: {
+          username,
+          firstName,
+          lastName,
+          photo_url,
+          isSubscribed: true,
+        },
         create: {
           telegramId,
           username,
           firstName,
           lastName,
+          photo_url,
           isSubscribed: true,
         },
       });

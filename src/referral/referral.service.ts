@@ -11,14 +11,20 @@ import generateUniqueId from 'generate-unique-id';
 export class ReferralService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createReferral(referrerId: number) {
+  // Create a referral
+  async createReferral(referrerId: number, airdropId: number) {
     try {
       const referralLink = generateUniqueId({ length: 10 });
 
       return await this.prisma.referral.create({
         data: {
           referralLink,
-          referrerId,
+          referrer: {
+            connect: { id: referrerId },
+          },
+          airdrop: {
+            connect: { id: airdropId },
+          },
         },
       });
     } catch (error) {
@@ -26,9 +32,11 @@ export class ReferralService {
     }
   }
 
+  // Track and update referral when the referred user joins
   async trackReferral(referralLink: string, referredId: number) {
     try {
-      const referral = await this.prisma.referral.findUnique({
+      // Use findFirst instead of findUnique if referralLink is not unique
+      const referral = await this.prisma.referral.findFirst({
         where: { referralLink },
       });
 
@@ -40,10 +48,13 @@ export class ReferralService {
         throw new BadRequestException('Referral link has already been used.');
       }
 
+      // Use connect to link referredId to the User model
       return await this.prisma.referral.update({
         where: { referralLink },
         data: {
-          referredId,
+          referred: {
+            connect: { id: referredId },
+          },
         },
       });
     } catch (error) {
@@ -57,12 +68,13 @@ export class ReferralService {
     }
   }
 
+  // Get all referrals made by a specific user
   async getUserReferrals(referrerId: number) {
     try {
       return await this.prisma.referral.findMany({
         where: { referrerId },
         include: {
-          referred: true,
+          referred: true, // Include referred user data
         },
       });
     } catch (error) {
