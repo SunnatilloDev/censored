@@ -78,7 +78,7 @@ model Article {
   id            Int               @id @default(autoincrement())
   title         String
   subtitle      String?
-  content       String
+  content       Json
   isActive      Boolean           @default(true)
   conclusion    String?
   publishDate   DateTime?
@@ -91,10 +91,10 @@ model Article {
   ArticleView   ArticleView[]
   status        String            @default("Draft")
   views         Int               @default(0)
-  ArticleMedia  ArticleMedia[]
-  averageRating Float             @default(0)
-  totalRatings  Int               @default(0)
   ArticleRating ArticleRating[]
+  avgRating     Float             @default(0)
+  totalRatings  Int               @default(0)
+  ArticleMedia  ArticleMedia[]
 }
 
 model ArticleRating {

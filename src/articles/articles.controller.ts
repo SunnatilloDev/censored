@@ -15,7 +15,7 @@ import {
   UpdateArticleDto,
 } from 'src/articles/dto/index';
 import { ApiQuery, ApiTags } from '@nestjs/swagger';
-import { IsOptional } from 'class-validator';
+
 @ApiTags('Articles')
 @Controller('articles')
 export class ArticlesController {
@@ -23,12 +23,19 @@ export class ArticlesController {
 
   @Post()
   async createArticle(@Body() articleData: CreateArticleDto) {
-    return await this.articleService.createArticle(
-      articleData,
-      articleData.mediaUrls,
-    );
+    return await this.articleService.createArticle(articleData);
   }
 
+  @Get('top')
+  async getTopArticles(
+    @Query('count') count: number,
+    @Query('latest') latest: boolean,
+  ) {
+    return await this.articleService.getTopArticles(
+      Number(count),
+      JSON.parse(latest.toString()),
+    );
+  }
   @Post(':id/rate')
   async rateArticle(
     @Param('id') articleId: string,
@@ -40,10 +47,12 @@ export class ArticlesController {
       body.rating,
     );
   }
+
   @Get(':id/rate')
   async getRateArticle(@Param('id') articleId: string) {
     return this.articleService.getRateArticle(Number(articleId));
   }
+
   @Get(':id')
   @ApiQuery({ name: 'userId', required: false, type: String })
   async getArticle(
@@ -52,10 +61,7 @@ export class ArticlesController {
   ) {
     return await this.articleService.getArticle(articleId, Number(userId));
   }
-  @Get('top')
-  async getTopArticles(@Query('count') count: number) {
-    return await this.articleService.getTopArticles(count);
-  }
+
   @Put(':id')
   async updateArticle(
     @Param('id') articleId: string,

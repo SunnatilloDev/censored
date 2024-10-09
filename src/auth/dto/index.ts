@@ -6,17 +6,23 @@ export class RegisterDto {
   @IsString()
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsString()
   username: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   first_name?: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    required: false,
+  })
   @IsOptional()
   @IsString()
   last_name?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  photo_url?: string;
 }
