@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -36,9 +41,12 @@ export class AirdropsService {
         where: { isSubscribed: true },
       });
 
-      const notifications = subscribedUsers.map(user => {
+      const notifications = subscribedUsers.map((user) => {
         const message = `🚀 New Airdrop: ${airdrop.name}\n\n${airdrop.description}\n\nPrize Pool: ${airdrop.prizePool}`;
-        return this.notificationsService.sendNotification(user.telegramId, message);
+        return this.notificationsService.sendNotification(
+          user.telegramId,
+          message,
+        );
       });
 
       await Promise.all(notifications); // Notify all users asynchronously
@@ -68,7 +76,9 @@ export class AirdropsService {
       }
     } catch (error) {
       console.error(error);
-      throw new InternalServerErrorException('Failed to increment airdrop views.');
+      throw new InternalServerErrorException(
+        'Failed to increment airdrop views.',
+      );
     }
   }
 
@@ -135,7 +145,9 @@ export class AirdropsService {
       });
     } catch (error) {
       console.error(error);
-      throw new InternalServerErrorException('Failed to retrieve participants.');
+      throw new InternalServerErrorException(
+        'Failed to retrieve participants.',
+      );
     }
   }
 
@@ -148,7 +160,9 @@ export class AirdropsService {
       });
 
       if (existingParticipant) {
-        throw new BadRequestException('User is already participating in this airdrop.');
+        throw new BadRequestException(
+          'User is already participating in this airdrop.',
+        );
       }
 
       return await this.prisma.userAirdrop.create({
@@ -164,7 +178,9 @@ export class AirdropsService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException('Failed to participate in airdrop.');
+      throw new InternalServerErrorException(
+        'Failed to participate in airdrop.',
+      );
     }
   }
 
@@ -175,7 +191,9 @@ export class AirdropsService {
       });
 
       if (!task || task.airdropId !== airdropId) {
-        throw new NotFoundException('Task not found or does not belong to this airdrop.');
+        throw new NotFoundException(
+          'Task not found or does not belong to this airdrop.',
+        );
       }
 
       await this.prisma.task.update({
