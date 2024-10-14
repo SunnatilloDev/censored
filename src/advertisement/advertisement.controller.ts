@@ -1,9 +1,6 @@
 import { Controller, Post, Put, Get, Param, Body } from '@nestjs/common';
 import { AdvertisementService } from './advertisement.service';
-import {
-  CreateAdvertisementDto,
-  UpdateAdvertisementDto,
-} from 'src/advertisement/dto/index';
+import { CreateAdvertisementDto, UpdateAdvertisementDto } from './dto';
 import { ApiTags } from '@nestjs/swagger';
 @ApiTags('Advertisements')
 @Controller('advertisements')

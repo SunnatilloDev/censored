@@ -16,6 +16,7 @@ import {
 } from 'src/articles/dto/index';
 import { ApiQuery, ApiTags } from '@nestjs/swagger';
 
+
 @ApiTags('Articles')
 @Controller('articles')
 export class ArticlesController {
@@ -25,7 +26,10 @@ export class ArticlesController {
   async createArticle(@Body() articleData: CreateArticleDto) {
     return await this.articleService.createArticle(articleData);
   }
-
+  @Get()
+  async getAllArticles() {
+    return await this.articleService.getAllArticles();
+  }
   @Get('top')
   async getTopArticles(
     @Query('count') count: number,

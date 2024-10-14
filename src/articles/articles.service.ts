@@ -1,11 +1,11 @@
 import {
-  Injectable,
-  NotFoundException,
-  InternalServerErrorException,
   BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateArticleDto, UpdateArticleDto } from 'src/articles/dto/index';
+import { CreateArticleDto, UpdateArticleDto } from './dto';
 import transformArticleData from 'src/articles/utils/rowToNiceStructure';
 
 @Injectable()
@@ -13,6 +13,22 @@ export class ArticlesService {
   constructor(private prisma: PrismaService) {}
 
   // Increment article views
+  async getAllArticles() {
+    try {
+      return (
+        await this.prisma.article.findMany({
+          include: {
+            ArticleRating: true,
+            author: true,
+            ArticleTag: { include: { tag: true } },
+            categories: { include: { category: true } },
+          },
+        })
+      ).map((article) => transformArticleData(article));
+    } catch (err) {
+      throw new InternalServerErrorException(err.message);
+    }
+  }
   async incrementArticleViews(articleId: number, userId: number) {
     try {
       if (!userId) return;

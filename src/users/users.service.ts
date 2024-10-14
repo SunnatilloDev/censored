@@ -1,7 +1,7 @@
 import {
   Injectable,
-  NotFoundException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdateUserDto } from 'src/users/dto/index';
@@ -20,22 +20,28 @@ export class UsersService {
         throw new NotFoundException('User not found');
       }
 
-      return user;
+      return {
+        ...user,
+        telegramId: undefined,
+        createdAt: undefined,
+        updatedAt: undefined,
+      };
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       throw new InternalServerErrorException('Failed to retrieve user.');
     }
   }
 
   async updateOne(id: number, body: UpdateUserDto) {
     try {
-      const user = await this.prisma.user.update({
+      return await this.prisma.user.update({
         where: { id },
         data: {
           ...body,
         },
       });
-
-      return user;
     } catch (error) {
       if (error.code === 'P2025') {
         throw new NotFoundException('User not found');
