@@ -5,10 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdateUserDto } from 'src/users/dto/index';
+import { UploadService } from 'src/upload/upload.service'; // Import the UploadService
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private uploadService: UploadService, // Inject UploadService
+  ) {}
 
   async getOneById(id: number) {
     try {
@@ -34,12 +38,21 @@ export class UsersService {
     }
   }
 
-  async updateOne(id: number, body: UpdateUserDto) {
+  async updateOne(id: number, body: UpdateUserDto, file?: Express.Multer.File) {
     try {
+      let photoUrl: string | undefined;
+
+      // Handle photo upload if file is provided
+      if (file) {
+        const { filePath } = await this.uploadService.saveFile(file);
+        photoUrl = filePath;
+      }
+
       return await this.prisma.user.update({
         where: { id },
         data: {
           ...body,
+          photo_url: photoUrl || body.photo_url, // Update photo URL if a new file is uploaded
         },
       });
     } catch (error) {

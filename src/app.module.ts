@@ -24,6 +24,7 @@ import { ReferralModule } from './referral/referral.module';
 import { AdvertisementService } from './advertisement/advertisement.service';
 import { AdvertisementModule } from './advertisement/advertisement.module';
 import { TagsModule } from './tags/tags.module';
+import { UploadService } from './upload/upload.service';
 
 @Module({
   imports: [
@@ -57,8 +58,7 @@ import { TagsModule } from './tags/tags.module';
     CategoriesService,
     PrismaService,
     NotificationsService,
-    AdvertisementService,
-    
+    AdvertisementService,UploadService
   ],
 })
 export class AppModule {}

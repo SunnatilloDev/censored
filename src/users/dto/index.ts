@@ -3,6 +3,7 @@ import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateUserDto {
   id?: number;
+
   @ApiProperty()
   @IsString()
   username: string;
@@ -33,18 +34,33 @@ export class UpdateUserDto {
   @IsOptional()
   username?: string;
 
-  @IsString()
   @ApiProperty()
+  @IsString()
   @IsOptional()
   firstName?: string;
 
-  @IsString()
   @ApiProperty()
+  @IsString()
   @IsOptional()
   lastName?: string;
 
-  @IsBoolean()
   @ApiProperty()
+  @IsString()
+  @IsOptional()
+  photo_url?: string; // For profile photo URL
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  profileHeader?: string; // New field for profile header
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  about?: string; // New field for "about you" information
+
+  @ApiProperty()
+  @IsBoolean()
   @IsOptional()
   isSubscribed?: boolean;
 }

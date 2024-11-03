@@ -12,7 +12,7 @@ import transformArticleData from 'src/articles/utils/rowToNiceStructure';
 export class ArticlesService {
   constructor(private prisma: PrismaService) {}
 
-  // Increment article views
+  // Get all articles
   async getAllArticles() {
     try {
       return (
@@ -29,6 +29,9 @@ export class ArticlesService {
       throw new InternalServerErrorException(err.message);
     }
   }
+
+
+  // Increment article views
   async incrementArticleViews(articleId: number, userId: number) {
     try {
       if (!userId) return;
@@ -167,7 +170,6 @@ export class ArticlesService {
         where: { id: parseInt(articleId) },
         data: {
           ...updateData,
-          // Ensure content is serialized into a valid JSON string
           content: updateData.content
             ? JSON.stringify(updateData.content)
             : undefined,
@@ -280,7 +282,7 @@ export class ArticlesService {
     return { averageRating, ratings };
   }
 
-  // Fetch top articles based on views
+  // Fetch top articles based on views and average rating
   async getTopArticles(limit: number, latest: boolean) {
     console.log('getTopArticles invoked with limit:', limit);
     try {
@@ -304,12 +306,79 @@ export class ArticlesService {
         },
       });
 
-      return topArticles.map((article) => {
-        return transformArticleData(article);
-      });
+      return topArticles.map((article) => transformArticleData(article));
     } catch (error) {
       console.error('Error in getTopArticles:', error);
       throw new InternalServerErrorException('Failed to fetch top articles.');
+    }
+  }
+  async reportScam(
+    articleId: number,
+    reportedById: number,
+    reason: string,
+    proof?: string,
+  ) {
+    try {
+      const article = await this.prisma.article.findUnique({
+        where: { id: articleId },
+      });
+
+      if (!article) {
+        throw new NotFoundException(`Article with ID ${articleId} not found.`);
+      }
+
+      // Create a new ScamReport
+      await this.prisma.scamReport.create({
+        data: {
+          articleId,
+          reportedById,
+          reason,
+          proof,
+        },
+      });
+
+      return { message: 'Scam report created successfully' };
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to report scam.');
+    }
+  }
+
+  // Method to remove a scam report
+  async removeScamReport(reportId: number) {
+    try {
+      const report = await this.prisma.scamReport.findUnique({
+        where: { id: reportId },
+      });
+
+      if (!report) {
+        throw new NotFoundException(`Scam report with ID ${reportId} not found.`);
+      }
+  
+      // Delete the scam report
+      await this.prisma.scamReport.delete({
+        where: { id: reportId },
+      });
+
+      return { message: 'Scam report removed successfully' };
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to remove scam report.');
+    }
+  }
+  async getScamReports(articleId: number) {
+    try {
+      const article = await this.prisma.article.findUnique({
+        where: { id: articleId },
+        include: { ScamReports: true },
+      });
+
+      if (!article) {
+        throw new NotFoundException(`Article with ID ${articleId} not found.`);
+      }
+
+      return article.ScamReports;
+    } catch (error) {
+
+      throw new InternalServerErrorException('Failed to fetch scam reports.');
     }
   }
 }

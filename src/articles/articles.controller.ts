@@ -12,10 +12,10 @@ import { ArticlesService } from './articles.service';
 import {
   CreateArticleDto,
   RateArticleDto,
+  ReportScamDto,
   UpdateArticleDto,
 } from 'src/articles/dto/index';
 import { ApiQuery, ApiTags } from '@nestjs/swagger';
-
 
 @ApiTags('Articles')
 @Controller('articles')
@@ -26,10 +26,12 @@ export class ArticlesController {
   async createArticle(@Body() articleData: CreateArticleDto) {
     return await this.articleService.createArticle(articleData);
   }
+
   @Get()
   async getAllArticles() {
     return await this.articleService.getAllArticles();
   }
+
   @Get('top')
   async getTopArticles(
     @Query('count') count: number,
@@ -40,6 +42,7 @@ export class ArticlesController {
       JSON.parse(latest.toString()),
     );
   }
+
   @Post(':id/rate')
   async rateArticle(
     @Param('id') articleId: string,
@@ -77,5 +80,23 @@ export class ArticlesController {
   @Delete(':id')
   async deleteArticle(@Param('id') articleId: string) {
     return await this.articleService.deleteArticle(articleId);
+  }
+
+  @Post(':id/report-scam')
+  async reportArticleAsScam(
+    @Param('id') articleId: string,
+    @Body() body: ReportScamDto,
+  ) {
+    return this.articleService.reportScam(
+      Number(articleId),
+      body.reportedById,
+      body.reason,
+      body.proof,
+    );
+  }
+
+  @Get(':id/scam-reports')
+  async getScamReports(@Param('id') articleId: string) {
+    return this.articleService.getScamReports(Number(articleId));
   }
 }

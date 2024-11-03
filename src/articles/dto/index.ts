@@ -187,3 +187,20 @@ export class RateArticleDto {
   @IsInt()
   userId: number;
 }
+
+export class ReportScamDto {
+  @ApiProperty()
+  @IsInt()
+  @IsNotEmpty()
+  reportedById: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  proof?: string;
+}

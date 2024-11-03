@@ -7,6 +7,7 @@ import { ApiTags } from '@nestjs/swagger';
 export class AdvertisementController {
   constructor(private readonly advertisementService: AdvertisementService) {}
 
+
   @Post()
   async createAdvertisement(@Body() adData: CreateAdvertisementDto) {
     return await this.advertisementService.createAdvertisement(adData);
