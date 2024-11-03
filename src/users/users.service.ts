@@ -44,7 +44,7 @@ export class UsersService {
 
       // Handle photo upload if file is provided
       if (file) {
-        const { filePath } = await this.uploadService.saveFile(file);
+        const filePath = await this.uploadService.saveFile(file);
         photoUrl = filePath;
       }
 
