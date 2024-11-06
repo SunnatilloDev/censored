@@ -7,6 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  OWNER
+  ADMIN
+  MODERATOR
+  USER
+}
+
 model User {
   id            Int             @id @default(autoincrement())
   telegramId    String          @unique
@@ -15,6 +22,7 @@ model User {
   lastName      String?
   isSubscribed  Boolean         @default(false)
   photo_url     String?
+  role          Role            @default(USER) // New field for roles
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   airdrops      UserAirdrop[]
@@ -24,7 +32,8 @@ model User {
   ArticleView   ArticleView[]
   AirdropView   AirdropView[]
   ArticleRating ArticleRating[]
-  ScamReports   ScamReport[] // Relation to scam reports
+  ScamReports   ScamReport[]
+  lastOnline    DateTime[]
 }
 
 model Article {

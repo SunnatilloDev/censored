@@ -8,7 +8,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { UpdateUserDto } from 'src/users/dto/index';
+import { UpdateUserDto } from './dto';
 import { UsersService } from 'src/users/users.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -20,6 +20,14 @@ export class UsersController {
   @Get(':id')
   async getOneById(@Param('id') id: string) {
     return await this.usersService.getOneById(Number(id));
+  }
+  @Get(':id/status')
+  async getStatus(@Param('id') id: string) {
+
+  }
+  @Put(':id/status')
+  async updateStatus(@Param('id') id: string) {
+
   }
 
   @Put(':id')

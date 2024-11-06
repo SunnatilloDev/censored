@@ -1,15 +1,19 @@
 import {
   Injectable,
   InternalServerErrorException,
-  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
+import { Role } from '@prisma/client';
+import { JwtService } from '@nestjs/jwt';
+import * as process from 'node:process'; // Import the Role enum from Prisma
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly jwtService: JwtService) {}
 
+  // Function to verify and register a user
   async verifyAndRegisterUser(telegramData: any) {
     try {
       const {
@@ -42,17 +46,24 @@ export class AuthService {
           lastName,
           photo_url,
           isSubscribed: true,
+          role: Role.USER, // Default role set to USER
         },
       });
-
-      return { isSubscribed: true, user };
+      const {accessToken,refreshToken} = this.jwtGenerator({ userId:user.id, email: username })
+      return { isSubscribed: true, user, tokens:{accessToken,refreshToken} };
     } catch (error) {
       throw new InternalServerErrorException(
         'Failed to verify and register user.',
       );
     }
   }
-
+  jwtGenerator(payload){
+    return {
+      accessToken: this.jwtService.sign(payload, {privateKey:process.env.JWT_SECRET, expiresIn: "15m"}),
+      refreshToken: this.jwtService.sign(payload, {privateKey:process.env.JWT_SECRET, expiresIn: "30d"})
+    }
+  }
+  // Function to check if a user is subscribed
   async checkSubscription(telegramId: string): Promise<boolean> {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const channelId = process.env.TELEGRAM_CHANNEL_ID;
@@ -67,7 +78,6 @@ export class AuthService {
           },
         },
       );
-      console.log(channelId, telegramId);
 
       const { status } = response.data.result;
       return (
@@ -79,7 +89,7 @@ export class AuthService {
       console.error('Error checking Telegram subscription:', error);
 
       if (error.response && error.response.data) {
-        throw new BadRequestException(
+        throw new ForbiddenException(
           `Telegram API Error: ${error.response.data.description}`,
         );
       }
@@ -88,5 +98,16 @@ export class AuthService {
         'Failed to check Telegram subscription.',
       );
     }
+  }
+
+  // Function to check if a user has the required role
+  async hasRole(userId: number, requiredRole: Role): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw new ForbiddenException('User not found.');
+    }
+
+    return user.role === requiredRole || user.role === Role.OWNER;
   }
 }

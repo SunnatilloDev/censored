@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Query, Redirect } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto } from 'src/auth/dto/index';
+import { RegisterDto } from './dto';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Auth')
@@ -13,7 +13,7 @@ export class AuthController {
     const userData = await this.authService.verifyAndRegisterUser(query);
 
     if (userData.isSubscribed) {
-      return { message: 'Registration successful!', user: userData };
+      return { message: 'Registration successful!', user: userData, tokens: userData.tokens };
     } else {
       return {
         message:
