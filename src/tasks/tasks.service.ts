@@ -18,7 +18,17 @@ export class TasksService {
   ) {}
 
   async createTask(createTaskDto: CreateTaskDto) {
-    const { title, description, type, openingDate, airdropId } = createTaskDto;
+    const {
+      title,
+      description,
+      type,
+      openingDate,
+      airdropId,
+      promoCode,
+      question,
+      options,
+      correctAnswer,
+    } = createTaskDto;
     try {
       const task = await this.prisma.task.create({
         data: {
@@ -27,10 +37,13 @@ export class TasksService {
           type,
           openingDate: openingDate ? new Date(openingDate) : null,
           airdropId,
+          promoCode,
+          question,
+          options,
+          correctAnswer,
         },
       });
 
-      // If the task type is "Promo Code", notify all participants
       if (type === 'PromoCode') {
         await this.notifyParticipantsForPromoCodeTask(airdropId, task.id);
       }
@@ -40,7 +53,29 @@ export class TasksService {
       throw new InternalServerErrorException('Failed to create task.');
     }
   }
-  async checkIncompleteTasks(userId: number, airdropId: number) {
+
+  async getTasksByAirdrop(airdropId: number) {
+    return await this.prisma.task.findMany({ where: { airdropId } });
+  }
+
+  async updateTaskStatus(
+    taskId: number,
+    updateTaskStatusDto: UpdateTaskStatusDto,
+  ) {
+    const { userId, isCompleted } = updateTaskStatusDto;
+    const task = await this.prisma.task.findUnique({ where: { id: taskId } });
+
+    if (!task) throw new NotFoundException(`Task with ID ${taskId} not found.`);
+
+    await this.prisma.userAirdrop.update({
+      where: { userId_airdropId: { userId, airdropId: task.airdropId } },
+      data: { tasksCompleted: { increment: isCompleted ? 1 : 0 } },
+    });
+
+    if (isCompleted)
+      await this.checkAndNotifyIncompleteTasks(userId, task.airdropId);
+  }
+  async checkAndNotifyIncompleteTasks(userId: number, airdropId: number) {
     const incompleteTasks = await this.prisma.task.findMany({
       where: {
         airdropId,
@@ -51,21 +86,14 @@ export class TasksService {
     if (incompleteTasks.length > 0) {
       await this.notificationsService.sendTelegramNotification(
         userId.toString(),
-        'You have incomplete tasks in the airdrop! Please complete them soon.',
+        'You have incomplete tasks in the airdrop!',
       );
     }
   }
-  @Cron('0 * * * *') // Runs every hour
+  @Cron('0 * * * *')
   async notifyUsersWithIncompleteTasks() {
     const userAirdrops = await this.prisma.userAirdrop.findMany({
-      include: {
-        user: true,
-        airdrop: {
-          include: {
-            tasks: true,
-          },
-        },
-      },
+      include: { user: true, airdrop: { include: { tasks: true } } },
     });
 
     for (const userAirdrop of userAirdrops) {
@@ -92,70 +120,6 @@ export class TasksService {
           'A new Promo Code task is available! Complete it to earn extra points.',
         );
       }
-    }
-  }
-
-  async getTasksByAirdrop(airdropId: number) {
-    return await this.prisma.task.findMany({ where: { airdropId } });
-  }
-
-  async updateTaskStatus(
-    taskId: number,
-    updateTaskStatusDto: UpdateTaskStatusDto,
-  ) {
-    const { userId, isCompleted } = updateTaskStatusDto;
-
-    const task = await this.prisma.task.findUnique({
-      where: { id: taskId },
-    });
-
-    if (!task) {
-      throw new NotFoundException(`Task with ID ${taskId} not found.`);
-    }
-
-    await this.prisma.userAirdrop.update({
-      where: {
-        userId_airdropId: { userId, airdropId: task.airdropId },
-      },
-      data: {
-        tasksCompleted: { increment: isCompleted ? 1 : 0 },
-      },
-    });
-
-    if (isCompleted) {
-      this.checkAndNotifyIncompleteTasks(userId, task.airdropId);
-    }
-  }
-
-  async checkAndNotifyIncompleteTasks(userId: number, airdropId: number) {
-    const incompleteTasks = await this.prisma.task.findMany({
-      where: {
-        airdropId,
-        isCompleted: false,
-      },
-    });
-
-    if (incompleteTasks.length > 0) {
-      await this.notificationsService.sendTelegramNotification(
-        userId.toString(),
-        'You have incomplete tasks in the airdrop!',
-      );
-    }
-  }
-
-  async notifyForPromoCodeTask(taskId: number) {
-    const task = await this.prisma.task.findUnique({
-      where: { id: taskId },
-      include: { airdrop: { select: { participants: true } } },
-    });
-
-    if (task && task.type === 'PromoCode' && task.openingDate) {
-      task.airdrop.participants.forEach((participant) => {
-        this.notificationsService.sendTelegramNotification(
-          participant.userId.toString(),
-          'A new Promo Code task is available! Complete it to earn extra points.',
-        );
-      });
     }
   }
 }

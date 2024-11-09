@@ -13,7 +13,11 @@ export class AuthController {
     const userData = await this.authService.verifyAndRegisterUser(query);
 
     if (userData.isSubscribed) {
-      return { message: 'Registration successful!', user: userData, tokens: userData.tokens };
+      return {
+        message: 'Registration successful!',
+        user: userData.user,
+        tokens: userData.tokens,
+      };
     } else {
       return {
         message:

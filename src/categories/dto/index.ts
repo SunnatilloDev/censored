@@ -5,15 +5,18 @@ import {
   IsString,
   IsUrl,
 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCategoryDto {
   @IsNotEmpty()
+  @ApiProperty()
   @IsString()
   name: string;
-
+  @ApiProperty()
   @IsOptional()
   @IsString()
   description?: string;
+  @ApiProperty()
   @IsNotEmpty()
   @IsString()
   @IsUrl()
@@ -21,21 +24,13 @@ export class CreateCategoryDto {
 }
 
 export class UpdateCategoryDto {
+  @ApiProperty()
   @IsOptional()
   @IsString()
   name?: string;
 
+  @ApiProperty()
   @IsOptional()
   @IsString()
   description?: string;
-}
-
-export class CreateTagDto {
-  @IsNotEmpty()
-  @IsString()
-  name: string;
-
-  @IsOptional()
-  @IsInt()
-  articleId?: number;
 }

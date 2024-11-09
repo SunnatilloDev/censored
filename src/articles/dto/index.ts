@@ -18,59 +18,6 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class ContentBlockDto {
-  @ApiProperty({ example: 'text' })
-  @IsString()
-  @IsIn(['text', 'image', 'video'])
-  type: string;
-
-  @ApiProperty({ required: false, example: 'This is some text content.' })
-  @IsOptional()
-  @IsString()
-  value?: string;
-
-  @ApiProperty({ required: false, example: 'https://example.com/image.jpg' })
-  @IsOptional()
-  @IsUrl()
-  url?: string;
-
-  @ApiProperty({
-    required: false,
-    example: '16px',
-    description: 'Font size for text content',
-  })
-  @IsOptional()
-  @IsString()
-  fontSize?: string;
-
-  @ApiProperty({
-    required: false,
-    example: true,
-    description: 'Is the text bold?',
-  })
-  @IsOptional()
-  @IsBoolean()
-  bold?: boolean;
-
-  @ApiProperty({
-    required: false,
-    example: true,
-    description: 'Is the text italic?',
-  })
-  @IsOptional()
-  @IsBoolean()
-  italic?: boolean;
-
-  @ApiProperty({
-    required: false,
-    example: '#333',
-    description: 'Text color in hex',
-  })
-  @IsOptional()
-  @IsString()
-  color?: string;
-}
-
 export class CreateArticleDto {
   @ApiProperty()
   @IsString()
@@ -84,15 +31,10 @@ export class CreateArticleDto {
   @MaxLength(200)
   subtitle?: string;
 
-  @ApiProperty({
-    description: 'Content blocks (text, image, video)',
-    isArray: true,
-    type: ContentBlockDto,
-  })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ContentBlockDto)
-  content: ContentBlockDto[];
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  content: string;
 
   @ApiProperty({ required: false })
   @IsString()
@@ -124,11 +66,9 @@ export class CreateArticleDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  @MaxLength(50, { each: true })
-  tags?: string[];
+  tags?: number[];
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, example: [1, 2, 3] })
   @IsOptional()
   @IsArray()
   @IsInt({ each: true })
@@ -142,16 +82,11 @@ export class UpdateArticleDto {
   title?: string;
 
   @ApiProperty({
-    description: 'Updated content blocks (text, image, video)',
-    isArray: true,
-    type: ContentBlockDto,
     required: false,
   })
   @IsArray()
   @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => ContentBlockDto)
-  content?: ContentBlockDto[];
+  content?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -163,17 +98,16 @@ export class UpdateArticleDto {
   @IsISO8601()
   publishDate?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, example: [1, 2, 3] })
   @IsOptional()
   @IsArray()
   @IsInt({ each: true })
   categories?: number[];
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, example: [1, 2, 3] })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
+  tags?: number[];
 }
 
 export class RateArticleDto {

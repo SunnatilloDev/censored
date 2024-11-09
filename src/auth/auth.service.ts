@@ -27,11 +27,11 @@ export class AuthService {
         photo_url,
       } = telegramData;
 
-      const isSubscribed = await this.checkSubscription(telegramId);
-
-      if (!isSubscribed) {
-        return { isSubscribed: false };
-      }
+      // const isSubscribed = await this.checkSubscription(telegramId);
+      //
+      // if (!isSubscribed) {
+      //   return { isSubscribed: false };
+      // }
 
       const user = await this.prisma.user.upsert({
         where: { telegramId },

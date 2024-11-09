@@ -71,10 +71,10 @@ import { TasksModule } from './tasks/tasks.module';
     NotificationsService,
     AdvertisementService,
     UploadService,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: JwtAuthGuard,
+    // },
     {
       provide: APP_GUARD,
       useClass: RolesGuard,

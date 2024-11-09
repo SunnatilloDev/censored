@@ -5,23 +5,29 @@ import {
   IsNumber,
   IsArray,
 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateAirdropDto {
   @IsString()
+  @ApiProperty()
   name: string;
 
+  @ApiProperty()
   @IsString()
   description: string;
 
+  @ApiProperty()
   @IsDateString()
   startDate: string;
-
+  @ApiProperty()
   @IsDateString()
   endDate: string;
 
+  @ApiProperty()
   @IsNumber()
   prizePool: number;
 
+  @ApiProperty()
   @IsArray()
   tasks: {
     name: string;
@@ -32,6 +38,7 @@ export class CreateAirdropDto {
 }
 
 export class ParticipateAirdropDto {
+  @ApiProperty()
   @IsNumber()
   userId: number;
 }

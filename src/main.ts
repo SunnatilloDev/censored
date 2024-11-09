@@ -13,6 +13,7 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CryptoArticle API')
+    .addBearerAuth()
     .setDescription('API documentation')
     .build();
   app.useGlobalGuards(new RolesGuard(new Reflector()));

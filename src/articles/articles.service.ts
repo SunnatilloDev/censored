@@ -75,16 +75,37 @@ export class ArticlesService {
         throw new BadRequestException('The author must be a valid user ID.');
       }
 
+      // Check if all categories exist
+      const existingCategories = await this.prisma.category.findMany({
+        where: {
+          id: { in: articleData.categories },
+        },
+      });
+
+      if (existingCategories.length !== articleData.categories.length) {
+        throw new BadRequestException('One or more categories are invalid.');
+      }
+      const existingTags = await this.prisma.tag.findMany({
+        where: {
+          id: { in: articleData.categories },
+        },
+      });
+
+      if (existingTags.length !== articleData.tags.length) {
+        throw new BadRequestException('One or more tags are invalid.');
+      }
+
+      // Proceed with creating the article
       return await this.prisma.article.create({
         data: {
           title: articleData.title,
           subtitle: articleData.subtitle,
-          content: JSON.stringify(articleData.content),
+          content: articleData.content,
           conclusion: articleData.conclusion,
           authorId: articleData.authorId,
-          status: (articleData.status as ArticleStatus) || ArticleStatus.DRAFT, // Use enum value
+          status: articleData.status.toUpperCase() as ArticleStatus,
           categories: {
-            connect: articleData.categories?.map((categoryId) => ({
+            connect: articleData.categories.map((categoryId) => ({
               id: categoryId,
             })),
           },
@@ -102,6 +123,7 @@ export class ArticlesService {
       throw new InternalServerErrorException('Failed to create article.');
     }
   }
+
   async searchArticles(query: string) {
     return this.prisma.article.findMany({
       where: {
@@ -145,20 +167,20 @@ export class ArticlesService {
 
   // Restore a specific version
   async restoreArticleVersion(articleId: number, versionId: number) {
-    const version = await this.prisma.articleHistory.findUnique({
-      where: { id: versionId },
-    });
-    if (!version) throw new NotFoundException('Version not found');
-
-    return this.prisma.article.update({
-      where: { id: articleId },
-      data: {
-        title: version.title,
-        subtitle: version.subtitle,
-        content: version.content,
-        conclusion: version.conclusion, // This field now exists
-      },
-    });
+    // const version = await this.prisma.articleHistory.findUnique({
+    //   where: { id: versionId },
+    // });
+    // if (!version) throw new NotFoundException('Version not found');
+    //
+    // return this.prisma.article.update({
+    //   where: { id: articleId },
+    //   data: {
+    //     title: version.title,
+    //     subtitle: version.subtitle,
+    //     content: version.content,
+    //     conclusion: version.conclusion, // This field now exists
+    //   },
+    // });
   }
 
   // Retrieve an article

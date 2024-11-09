@@ -48,7 +48,7 @@ model Article {
   id                   Int               @id @default(autoincrement())
   title                String
   subtitle             String?
-  content              Json
+  content              String
   isActive             Boolean           @default(true)
   conclusion           String?
   publishDate          DateTime?
@@ -113,11 +113,22 @@ model Task {
   id          Int       @id @default(autoincrement())
   title       String
   description String
+  type        String // Can be "PromoCode" or "Quiz"
+  openingDate DateTime?
   airdropId   Int
   airdrop     Airdrop   @relation(fields: [airdropId], references: [id])
-  type        String // Can be "General" or "Promo Code"
-  isCompleted Boolean   @default(false)
-  openingDate DateTime? // Only for "Promo Code" type tasks
+
+  // PromoCode-specific fields
+  promoCode String? // Only for Promo Code tasks
+
+  // Quiz-specific fields
+  question      String? // Quiz question
+  options       Json? // Array of options for Quiz tasks
+  correctAnswer String? // Correct answer for Quiz tasks
+
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model UserAirdrop {
