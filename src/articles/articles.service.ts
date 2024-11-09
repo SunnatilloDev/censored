@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateArticleDto, UpdateArticleDto } from './dto';
 import transformArticleData from 'src/articles/utils/rowToNiceStructure';
+import { ArticleStatus } from '@prisma/client'; // Import the enum
 
 @Injectable()
 export class ArticlesService {
@@ -15,21 +16,19 @@ export class ArticlesService {
   // Get all articles
   async getAllArticles() {
     try {
-      return (
-        await this.prisma.article.findMany({
-          include: {
-            ArticleRating: true,
-            author: true,
-            ArticleTag: { include: { tag: true } },
-            categories: { include: { category: true } },
-          },
-        })
-      ).map((article) => transformArticleData(article));
+      const articles = await this.prisma.article.findMany({
+        include: {
+          ArticleRating: true,
+          author: true,
+          ArticleTag: { include: { tag: true } },
+          categories: { include: { category: true } },
+        },
+      });
+      return articles.map((article) => transformArticleData(article));
     } catch (err) {
       throw new InternalServerErrorException(err.message);
     }
   }
-
 
   // Increment article views
   async incrementArticleViews(articleId: number, userId: number) {
@@ -76,14 +75,14 @@ export class ArticlesService {
         throw new BadRequestException('The author must be a valid user ID.');
       }
 
-      const article = await this.prisma.article.create({
+      return await this.prisma.article.create({
         data: {
           title: articleData.title,
           subtitle: articleData.subtitle,
           content: JSON.stringify(articleData.content),
           conclusion: articleData.conclusion,
           authorId: articleData.authorId,
-          status: articleData.status || 'Draft',
+          status: (articleData.status as ArticleStatus) || ArticleStatus.DRAFT, // Use enum value
           categories: {
             connect: articleData.categories?.map((categoryId) => ({
               id: categoryId,
@@ -96,14 +95,70 @@ export class ArticlesService {
           },
         },
       });
-
-      return article;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to create article.');
     }
+  }
+  async searchArticles(query: string) {
+    return this.prisma.article.findMany({
+      where: {
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          {
+            ArticleTag: {
+              some: { tag: { name: { contains: query, mode: 'insensitive' } } },
+            },
+          },
+          {
+            categories: {
+              some: {
+                category: { name: { contains: query, mode: 'insensitive' } },
+              },
+            },
+          },
+        ],
+      },
+      include: { ArticleTag: true, author: true },
+    });
+  }
+  // Save a version before updating the article
+  private async saveArticleVersion(articleId: number) {
+    const article = await this.prisma.article.findUnique({
+      where: { id: articleId },
+    });
+    if (article) {
+      await this.prisma.articleHistory.create({
+        data: {
+          articleId,
+          title: article.title,
+
+          subtitle: article.subtitle,
+          content: article.content,
+          conclusion: article.conclusion, // This field now exists
+        },
+      });
+    }
+  }
+
+  // Restore a specific version
+  async restoreArticleVersion(articleId: number, versionId: number) {
+    const version = await this.prisma.articleHistory.findUnique({
+      where: { id: versionId },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+
+    return this.prisma.article.update({
+      where: { id: articleId },
+      data: {
+        title: version.title,
+        subtitle: version.subtitle,
+        content: version.content,
+        conclusion: version.conclusion, // This field now exists
+      },
+    });
   }
 
   // Retrieve an article
@@ -158,16 +213,20 @@ export class ArticlesService {
   // Update an article
   async updateArticle(articleId: string, updateData: UpdateArticleDto) {
     try {
+      const id = parseInt(articleId);
       const articleExists = await this.prisma.article.findUnique({
-        where: { id: parseInt(articleId) },
+        where: { id },
       });
 
       if (!articleExists) {
         throw new NotFoundException(`Article with ID ${articleId} not found.`);
       }
 
+      // Save the current version before updating
+      await this.saveArticleVersion(id);
+
       return await this.prisma.article.update({
-        where: { id: parseInt(articleId) },
+        where: { id },
         data: {
           ...updateData,
           content: updateData.content
@@ -195,8 +254,9 @@ export class ArticlesService {
   // Delete an article
   async deleteArticle(articleId: string) {
     try {
+      const id = parseInt(articleId);
       const articleExists = await this.prisma.article.findUnique({
-        where: { id: parseInt(articleId) },
+        where: { id },
       });
 
       if (!articleExists) {
@@ -204,11 +264,11 @@ export class ArticlesService {
       }
 
       await this.prisma.articleMedia.deleteMany({
-        where: { articleId: parseInt(articleId) },
+        where: { articleId: id },
       });
 
       return await this.prisma.article.delete({
-        where: { id: parseInt(articleId) },
+        where: { id },
       });
     } catch (error) {
       throw new InternalServerErrorException('Failed to delete article.');
@@ -272,7 +332,9 @@ export class ArticlesService {
       user: {
         username: article.author.username,
         photo_url: article.author.photo_url,
-        name: `${article.author.firstName ?? ''} ${article.author.lastName ?? ''}`.trim(),
+        name: `${article.author.firstName ?? ''} ${
+          article.author.lastName ?? ''
+        }`.trim(),
       },
     }));
     const averageRating =
@@ -284,20 +346,24 @@ export class ArticlesService {
 
   // Fetch top articles based on views and average rating
   async getTopArticles(limit: number, latest: boolean) {
-    console.log('getTopArticles invoked with limit:', limit);
     try {
       const takeLimit = Number(limit);
       if (isNaN(takeLimit) || takeLimit <= 0) {
         throw new BadRequestException('Invalid limit parameter');
       }
 
+      const orderBy: any[] = [
+        { views: 'desc' as const },
+        { avgRating: 'desc' as const },
+      ];
+
+      if (latest) {
+        orderBy.push({ createdAt: 'desc' as const });
+      }
+
       const topArticles = await this.prisma.article.findMany({
         take: takeLimit,
-        orderBy: [
-          { views: 'desc' },
-          { avgRating: 'desc' },
-          { createdAt: latest ? 'desc' : undefined },
-        ],
+        orderBy,
         include: {
           ArticleRating: true,
           author: true,
@@ -351,9 +417,11 @@ export class ArticlesService {
       });
 
       if (!report) {
-        throw new NotFoundException(`Scam report with ID ${reportId} not found.`);
+        throw new NotFoundException(
+          `Scam report with ID ${reportId} not found.`,
+        );
       }
-  
+
       // Delete the scam report
       await this.prisma.scamReport.delete({
         where: { id: reportId },
@@ -364,6 +432,7 @@ export class ArticlesService {
       throw new InternalServerErrorException('Failed to remove scam report.');
     }
   }
+
   async getScamReports(articleId: number) {
     try {
       const article = await this.prisma.article.findUnique({
@@ -377,7 +446,6 @@ export class ArticlesService {
 
       return article.ScamReports;
     } catch (error) {
-
       throw new InternalServerErrorException('Failed to fetch scam reports.');
     }
   }

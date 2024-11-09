@@ -5,26 +5,24 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateReferralDto, TrackReferralDto } from './dto';
 import generateUniqueId from 'generate-unique-id';
 
 @Injectable()
 export class ReferralService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Create a referral
-  async createReferral(referrerId: number, airdropId: number) {
+  // Create a new referral link
+  async createReferral(data: CreateReferralDto) {
     try {
       const referralLink = generateUniqueId({ length: 10 });
+      const { userId, eventId } = data;
 
       return await this.prisma.referral.create({
         data: {
           referralLink,
-          referrer: {
-            connect: { id: referrerId },
-          },
-          airdrop: {
-            connect: { id: airdropId },
-          },
+          referrer: { connect: { id: userId } },
+          airdrop: { connect: { id: eventId } }, // Linking to an event/airdrop
         },
       });
     } catch (error) {
@@ -32,30 +30,19 @@ export class ReferralService {
     }
   }
 
-  // Track and update referral when the referred user joins
+  // Track referral usage by a referred user
   async trackReferral(referralLink: string, referredId: number) {
     try {
-      // Use findFirst instead of findUnique if referralLink is not unique
       const referral = await this.prisma.referral.findFirst({
         where: { referralLink },
       });
 
-      if (!referral) {
-        throw new NotFoundException('Invalid referral link.');
-      }
+      if (!referral) throw new NotFoundException('Invalid referral link.');
+      if (referral.referredId) throw new BadRequestException('Already used.');
 
-      if (referral.referredId) {
-        throw new BadRequestException('Referral link has already been used.');
-      }
-
-      // Use connect to link referredId to the User model
       return await this.prisma.referral.update({
         where: { referralLink },
-        data: {
-          referred: {
-            connect: { id: referredId },
-          },
-        },
+        data: { referred: { connect: { id: referredId } } },
       });
     } catch (error) {
       if (
@@ -73,9 +60,7 @@ export class ReferralService {
     try {
       return await this.prisma.referral.findMany({
         where: { referrerId },
-        include: {
-          referred: true, // Include referred user data
-        },
+        include: { referred: true }, // Include referred user data
       });
     } catch (error) {
       throw new InternalServerErrorException('Failed to get user referrals.');

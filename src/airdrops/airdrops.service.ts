@@ -5,153 +5,74 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { CreateAirdropDto, ParticipateAirdropDto } from './dto';
 
 @Injectable()
 export class AirdropsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async createAirdrop(airdropData: any) {
+  // Create a new airdrop with tasks
+
+  async createAirdrop(airdropData: CreateAirdropDto) {
     try {
-      const airdrop = await this.prisma.airdrop.create({
+      return await this.prisma.airdrop.create({
         data: {
           name: airdropData.name,
           description: airdropData.description,
-          isActive: airdropData.isActive ?? true, // Optional isActive flag
-          startDate: new Date(airdropData.startDate),
-          endDate: new Date(airdropData.endDate),
+          startDate: airdropData.startDate,
+          endDate: airdropData.endDate,
           prizePool: airdropData.prizePool,
+          tasks: {
+            create: airdropData.tasks.map((task) => ({
+              title: task.name,
+              description: task.description,
+              type: task.type ?? 'General', // Provide a default if missing
+              openingDate: task.openingDate ?? new Date(), // Default to current date if missing
+            })),
+          },
         },
       });
-
-      await this.notifyUsersAboutAirdrop(airdrop);
-      return airdrop;
     } catch (error) {
-      console.error(error);
-      throw new InternalServerErrorException('Failed to create airdrop.');
-    }
-  }
-
-  private async notifyUsersAboutAirdrop(airdrop: any) {
-    try {
-      const subscribedUsers = await this.prisma.user.findMany({
-        where: { isSubscribed: true },
-      });
-
-      const notifications = subscribedUsers.map((user) => {
-        const message = `🚀 New Airdrop: ${airdrop.name}\n\n${airdrop.description}\n\nPrize Pool: ${airdrop.prizePool}`;
-        return this.notificationsService.sendNotification(
-          user.telegramId,
-          message,
-        );
-      });
-
-      await Promise.all(notifications); // Notify all users asynchronously
-    } catch (error) {
-      console.error(error);
-      throw new InternalServerErrorException('Failed to notify users.');
-    }
-  }
-
-  async incrementAirdropViews(airdropId: number, userId: number) {
-    try {
-      const hasViewed = await this.prisma.airdropView.findUnique({
-        where: {
-          userId_airdropId: { userId, airdropId },
-        },
-      });
-
-      if (!hasViewed) {
-        await this.prisma.airdrop.update({
-          where: { id: airdropId },
-          data: {},
-        });
-
-        await this.prisma.airdropView.create({
-          data: { userId, airdropId },
-        });
-      }
-    } catch (error) {
-      console.error(error);
       throw new InternalServerErrorException(
-        'Failed to increment airdrop views.',
+        'Failed to create airdrop with tasks.',
       );
     }
   }
 
-  async getAirdrop(airdropId: number, userId: number) {
+  // Retrieve a specific airdrop
+  async getAirdrop(airdropId: number) {
     try {
-      await this.incrementAirdropViews(airdropId, userId);
       const airdrop = await this.prisma.airdrop.findUnique({
         where: { id: airdropId },
         include: {
-          participants: true,
           tasks: true,
+          participants: {
+            include: { user: true },
+          },
         },
       });
 
       if (!airdrop) {
         throw new NotFoundException(`Airdrop with ID ${airdropId} not found.`);
       }
-
       return airdrop;
     } catch (error) {
-      console.error(error);
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
       throw new InternalServerErrorException('Failed to retrieve airdrop.');
     }
   }
 
-  async updateAirdrop(airdropId: number, updateData: any) {
+  // Get all airdrops
+  async getAllAirdrops() {
     try {
-      const airdropExists = await this.prisma.airdrop.findUnique({
-        where: { id: airdropId },
-      });
-
-      if (!airdropExists) {
-        throw new NotFoundException(`Airdrop with ID ${airdropId} not found.`);
-      }
-
-      return await this.prisma.airdrop.update({
-        where: { id: airdropId },
-        data: {
-          name: updateData.name,
-          description: updateData.description,
-          isActive: updateData.isActive,
-          startDate: new Date(updateData.startDate),
-          endDate: new Date(updateData.endDate),
-          prizePool: updateData.prizePool,
-        },
-      });
+      return await this.prisma.airdrop.findMany();
     } catch (error) {
-      console.error(error);
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Failed to update airdrop.');
+      throw new InternalServerErrorException('Failed to retrieve airdrops.');
     }
   }
 
-  async getParticipants(airdropId: number) {
-    try {
-      return await this.prisma.userAirdrop.findMany({
-        where: { airdropId },
-        include: { user: true },
-      });
-    } catch (error) {
-      console.error(error);
-      throw new InternalServerErrorException(
-        'Failed to retrieve participants.',
-      );
-    }
-  }
-
-  async participateInAirdrop(airdropId: number, userId: number) {
+  // Register user participation in an airdrop
+  async participateInAirdrop(airdropId: number, data: ParticipateAirdropDto) {
+    const { userId } = data;
     try {
       const existingParticipant = await this.prisma.userAirdrop.findUnique({
         where: {
@@ -160,9 +81,7 @@ export class AirdropsService {
       });
 
       if (existingParticipant) {
-        throw new BadRequestException(
-          'User is already participating in this airdrop.',
-        );
+        throw new BadRequestException('User is already participating.');
       }
 
       return await this.prisma.userAirdrop.create({
@@ -170,20 +89,14 @@ export class AirdropsService {
           userId,
           airdropId,
           tasksCompleted: 0,
-          referredUsers: 0,
         },
       });
     } catch (error) {
-      console.error(error);
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException(
-        'Failed to participate in airdrop.',
-      );
+      throw new InternalServerErrorException('Failed to register participant.');
     }
   }
 
+  // Complete a task in an airdrop for a user
   async completeTask(airdropId: number, userId: number, taskId: number) {
     try {
       const task = await this.prisma.task.findUnique({
@@ -210,11 +123,18 @@ export class AirdropsService {
         },
       });
     } catch (error) {
-      console.error(error);
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
       throw new InternalServerErrorException('Failed to complete task.');
     }
+  }
+  async searchAirdrops(query: string) {
+    return this.prisma.airdrop.findMany({
+      where: {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      include: { tasks: true, participants: true },
+    });
   }
 }

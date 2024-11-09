@@ -1,30 +1,78 @@
+// src/notifications/notifications.service.ts
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateNotificationDto } from './dto/create-notification.dto';
+import * as cron from 'node-cron';
+import { Notification } from '@prisma/client'; // Import Notification model type
 import bot from 'src/bot/bot';
 
 @Injectable()
 export class NotificationsService {
-  // Send a notification based on the channel (currently only Telegram)
-  async sendNotification(
-    telegramId: string,
-    message: string,
-    channel: 'telegram' = 'telegram',
-  ): Promise<void> {
-    try {
-      if (channel === 'telegram') {
-        await this.sendTelegramNotification(telegramId, message);
-      } else {
-        throw new Error('Unsupported notification channel');
+  constructor(private prisma: PrismaService) {
+    this.scheduleNotifications(); // Start the cron job on service instantiation
+  }
+
+  async scheduleNotification(createNotificationDto: CreateNotificationDto) {
+    const { type, endDate, recipientRoles, message } = createNotificationDto;
+    const notification = await this.prisma.notification.create({
+      data: {
+        type,
+        endDate,
+        recipientRole: recipientRoles,
+        message,
+      },
+    });
+    return { message: 'Notification scheduled successfully', notification };
+  }
+
+  // Schedule a cron job to run every minute and check for due notifications
+  private scheduleNotifications() {
+    cron.schedule('* * * * *', async () => {
+      await this.sendDueNotifications();
+    });
+  }
+
+  // Check and send notifications that are due
+  private async sendDueNotifications() {
+    const now = new Date();
+    const dueNotifications = await this.prisma.notification.findMany({
+      where: {
+        endDate: { lte: now },
+      },
+    });
+
+    for (const notification of dueNotifications) {
+      await this.sendNotificationToRoles(notification);
+    }
+
+    // Optional: delete or update notifications after sending
+  }
+
+  // Send notifications to all users with specified roles
+  private async sendNotificationToRoles(notification: Notification) {
+    const { recipientRole, message } = notification;
+
+    for (const role of recipientRole) {
+      // Fetch users by role
+      const users = await this.prisma.user.findMany({
+        where: { role },
+      });
+
+      for (const user of users) {
+        try {
+          await this.sendTelegramNotification(user.telegramId, message);
+        } catch (error) {
+          console.error(`Failed to notify user ${user.telegramId}:`, error);
+          throw new InternalServerErrorException(
+            `Failed to notify user with Telegram ID ${user.telegramId}.`,
+          );
+        }
       }
-    } catch (error) {
-      console.error(`Failed to send notification to ${telegramId}:`, error);
-      throw new InternalServerErrorException(
-        `Failed to send notification to user with Telegram ID ${telegramId}.`,
-      );
     }
   }
 
-  // Function to handle sending messages via Telegram
-  private async sendTelegramNotification(
+  // Helper function to send a message via Telegram
+  async sendTelegramNotification(
     telegramId: string,
     message: string,
   ): Promise<void> {

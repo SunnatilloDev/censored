@@ -1,13 +1,15 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsInt, IsString } from 'class-validator';
 
 export class CreateTagDto {
+  @IsNotEmpty()
   @IsString()
-  @ApiProperty()
   name: string;
 
-  @IsString()
-  @ApiProperty()
   @IsOptional()
+  @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsInt()
+  articleId?: number; // Optional field to link the tag to an article
 }

@@ -26,6 +26,12 @@ import { AdvertisementModule } from './advertisement/advertisement.module';
 import { TagsModule } from './tags/tags.module';
 import { UploadService } from './upload/upload.service';
 import { UploadModule } from './upload/upload.module';
+import { JwtService } from '@nestjs/jwt';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
+import { StatusModule } from './status/status.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -43,7 +49,9 @@ import { UploadModule } from './upload/upload.module';
     ReferralModule,
     AdvertisementModule,
     TagsModule,
-    UploadModule
+    UploadModule,
+    StatusModule,
+    TasksModule,
   ],
   controllers: [
     AuthController,
@@ -53,6 +61,7 @@ import { UploadModule } from './upload/upload.module';
     CategoriesController,
   ],
   providers: [
+    JwtService,
     AuthService,
     UsersService,
     ArticlesService,
@@ -60,7 +69,16 @@ import { UploadModule } from './upload/upload.module';
     CategoriesService,
     PrismaService,
     NotificationsService,
-    AdvertisementService,UploadService
+    AdvertisementService,
+    UploadService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
   ],
 })
 export class AppModule {}

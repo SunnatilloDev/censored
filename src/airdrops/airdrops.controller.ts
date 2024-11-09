@@ -1,7 +1,8 @@
-import { Controller, Post, Get, Put, Param, Body, Query } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common';
 import { AirdropsService } from './airdrops.service';
-import { CreateAirdropDto, UpdateAirdropDto } from 'src/airdrops/dto/index';
+import { CreateAirdropDto, ParticipateAirdropDto } from './dto';
 import { ApiTags } from '@nestjs/swagger';
+
 @ApiTags('Airdrops')
 @Controller('airdrops')
 export class AirdropsController {
@@ -13,28 +14,29 @@ export class AirdropsController {
   }
 
   @Get(':id')
-  async getAirdrop(
-    @Param('id') airdropId: string,
-    @Query('userId') userId: number,
-  ) {
-    return await this.airdropService.getAirdrop(Number(airdropId), userId);
+  async getAirdrop(@Param('id') airdropId: string) {
+    return await this.airdropService.getAirdrop(Number(airdropId));
   }
 
-  @Put(':id')
-  async updateAirdrop(
+  @Get()
+  async getAllAirdrops() {
+    return await this.airdropService.getAllAirdrops();
+  }
+  @Get('search')
+  async searchAirdrops(@Query('query') query: string) {
+    return this.airdropService.searchAirdrops(query);
+  }
+  @Post(':id/participate')
+  async participateInAirdrop(
     @Param('id') airdropId: string,
-    @Body() updateData: UpdateAirdropDto,
+    @Body() data: ParticipateAirdropDto,
   ) {
-    return await this.airdropService.updateAirdrop(
+    return await this.airdropService.participateInAirdrop(
       Number(airdropId),
-      updateData,
+      data,
     );
   }
 
-  @Get(':id/participants')
-  async getParticipants(@Param('id') airdropId: string) {
-    return await this.airdropService.getParticipants(Number(airdropId));
-  }
   @Post(':id/tasks/:taskId/complete')
   async completeTask(
     @Param('id') airdropId: string,

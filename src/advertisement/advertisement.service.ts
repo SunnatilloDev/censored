@@ -5,26 +5,22 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateAdvertisementDto, UpdateAdvertisementDto } from './dto';
 
 @Injectable()
 export class AdvertisementService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createAdvertisement(adData: any) {
+  // Create a new advertisement
+  async createAdvertisement(adData: CreateAdvertisementDto) {
     try {
-      if (!adData.imageUrl || !adData.redirectUrl) {
-        throw new BadRequestException(
-          'Image URL and Redirect URL are required.',
-        );
-      }
-
       return await this.prisma.advertisement.create({
         data: {
           imageUrl: adData.imageUrl,
           redirectUrl: adData.redirectUrl,
+          startDate: new Date(adData.startDate),
+          endDate: new Date(adData.endDate),
           isActive: adData.isActive ?? true,
-          startDate: adData.startDate,
-          endDate: adData.endDate,
         },
       });
     } catch (error) {
@@ -32,7 +28,8 @@ export class AdvertisementService {
     }
   }
 
-  async updateAdvertisement(adId: number, updateData: any) {
+  // Update advertisement details
+  async updateAdvertisement(adId: number, updateData: UpdateAdvertisementDto) {
     try {
       const adExists = await this.prisma.advertisement.findUnique({
         where: { id: adId },
@@ -45,85 +42,79 @@ export class AdvertisementService {
       return await this.prisma.advertisement.update({
         where: { id: adId },
         data: {
-          imageUrl: updateData.imageUrl,
-          redirectUrl: updateData.redirectUrl,
-          isActive: updateData.isActive,
-          startDate: updateData.startDate,
-          endDate: updateData.endDate,
+          ...updateData,
+          startDate: updateData.startDate
+            ? new Date(updateData.startDate)
+            : undefined,
+          endDate: updateData.endDate
+            ? new Date(updateData.endDate)
+            : undefined,
         },
       });
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error; // Already handled
-      }
       throw new InternalServerErrorException('Failed to update advertisement.');
     }
   }
 
+  // Retrieve a single advertisement by ID
   async getAdvertisement(adId: number) {
+    const advertisement = await this.prisma.advertisement.findUnique({
+      where: { id: adId },
+    });
+
+    if (!advertisement) {
+      throw new NotFoundException(`Advertisement with ID ${adId} not found.`);
+    }
+    return advertisement;
+  }
+
+  // List all advertisements
+  async getAllAdvertisements() {
     try {
-      const advertisement = await this.prisma.advertisement.findUnique({
-        where: { id: adId },
-      });
-
-      if (!advertisement) {
-        throw new NotFoundException(`Advertisement with ID ${adId} not found.`);
-      }
-
-      return advertisement;
+      return await this.prisma.advertisement.findMany();
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error; // Already handled
-      }
       throw new InternalServerErrorException(
-        'Failed to retrieve advertisement.',
+        'Failed to retrieve advertisements.',
       );
     }
   }
 
-  async trackAdPerformance(adId: number, type: 'click' | 'impression') {
+  // Delete advertisement
+  async deleteAdvertisement(adId: number) {
     try {
-      const advertisement = await this.prisma.advertisement.findUnique({
+      const adExists = await this.prisma.advertisement.findUnique({
         where: { id: adId },
       });
 
-      if (!advertisement) {
+      if (!adExists) {
         throw new NotFoundException(`Advertisement with ID ${adId} not found.`);
       }
 
-      if (type === 'click') {
-        return await this.prisma.advertisement.update({
-          where: { id: adId },
-          data: {
-            clicks: {
-              increment: 1,
-            },
-          },
-        });
-      } else if (type === 'impression') {
-        return await this.prisma.advertisement.update({
-          where: { id: adId },
-          data: {
-            impressions: {
-              increment: 1,
-            },
-          },
-        });
-      } else {
-        throw new BadRequestException(
-          'Invalid performance type. It should be either "click" or "impression".',
-        );
-      }
+      await this.prisma.advertisement.delete({
+        where: { id: adId },
+      });
+
+      return { message: 'Advertisement deleted successfully.' };
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
-        throw error; // Already handled
-      }
-      throw new InternalServerErrorException(
-        'Failed to track advertisement performance.',
-      );
+      throw new InternalServerErrorException('Failed to delete advertisement.');
     }
+  }
+
+  // Track clicks or impressions
+  async trackAdPerformance(adId: number, type: 'click' | 'impression') {
+    const advertisement = await this.prisma.advertisement.findUnique({
+      where: { id: adId },
+    });
+
+    if (!advertisement) {
+      throw new NotFoundException(`Advertisement with ID ${adId} not found.`);
+    }
+
+    const fieldToUpdate = type === 'click' ? 'clicks' : 'impressions';
+
+    return this.prisma.advertisement.update({
+      where: { id: adId },
+      data: { [fieldToUpdate]: { increment: 1 } },
+    });
   }
 }

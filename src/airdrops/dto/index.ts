@@ -1,68 +1,37 @@
-import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
-  IsBoolean,
   IsDateString,
+  IsBoolean,
   IsNumber,
-  IsOptional,
-  IsISO8601,
+  IsArray,
 } from 'class-validator';
 
 export class CreateAirdropDto {
-  @ApiProperty()
   @IsString()
   name: string;
 
-  @ApiProperty()
   @IsString()
   description: string;
 
-  @ApiProperty()
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
+  @IsDateString()
+  startDate: string;
 
-  @ApiProperty({ example: new Date('2019-02-29') })
-  @IsISO8601()
-  startDate?: string;
-
-  @ApiProperty({ example: new Date('2019-02-29') })
-  @IsISO8601()
+  @IsDateString()
   endDate: string;
 
   @IsNumber()
-  @ApiProperty()
   prizePool: number;
+
+  @IsArray()
+  tasks: {
+    name: string;
+    description: string;
+    type?: string; // Optional type
+    openingDate?: Date; // Optional openingDate
+  }[];
 }
 
-export class UpdateAirdropDto {
-  @IsString()
-  @ApiProperty()
-  @IsOptional()
-  name?: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsBoolean()
-  @ApiProperty()
-  @IsOptional()
-  isActive?: boolean;
-
-  @ApiProperty({ example: '2020-12-12' })
-  @IsISO8601()
-  @IsOptional()
-  startDate?: string;
-
-  @ApiProperty()
-  @IsDateString()
-  @IsOptional()
-  endDate?: string;
-
+export class ParticipateAirdropDto {
   @IsNumber()
-  @ApiProperty()
-  @IsOptional()
-  prizePool?: number;
+  userId: number;
 }

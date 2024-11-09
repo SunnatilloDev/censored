@@ -21,14 +21,6 @@ export class UsersController {
   async getOneById(@Param('id') id: string) {
     return await this.usersService.getOneById(Number(id));
   }
-  @Get(':id/status')
-  async getStatus(@Param('id') id: string) {
-
-  }
-  @Put(':id/status')
-  async updateStatus(@Param('id') id: string) {
-
-  }
 
   @Put(':id')
   @UseInterceptors(FileInterceptor('file')) // Interceptor for handling file upload

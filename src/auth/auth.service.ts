@@ -11,7 +11,10 @@ import * as process from 'node:process'; // Import the Role enum from Prisma
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService, private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   // Function to verify and register a user
   async verifyAndRegisterUser(telegramData: any) {
@@ -47,21 +50,35 @@ export class AuthService {
           photo_url,
           isSubscribed: true,
           role: Role.USER, // Default role set to USER
+          status: 'offline',
         },
       });
-      const {accessToken,refreshToken} = this.jwtGenerator({ userId:user.id, email: username })
-      return { isSubscribed: true, user, tokens:{accessToken,refreshToken} };
+      const { accessToken, refreshToken } = this.jwtGenerator({
+        userId: user.id,
+        email: username,
+      });
+      return {
+        isSubscribed: true,
+        user,
+        tokens: { accessToken, refreshToken },
+      };
     } catch (error) {
       throw new InternalServerErrorException(
         'Failed to verify and register user.',
       );
     }
   }
-  jwtGenerator(payload){
+  jwtGenerator(payload) {
     return {
-      accessToken: this.jwtService.sign(payload, {privateKey:process.env.JWT_SECRET, expiresIn: "15m"}),
-      refreshToken: this.jwtService.sign(payload, {privateKey:process.env.JWT_SECRET, expiresIn: "30d"})
-    }
+      accessToken: this.jwtService.sign(payload, {
+        privateKey: process.env.JWT_SECRET,
+        expiresIn: '15m',
+      }),
+      refreshToken: this.jwtService.sign(payload, {
+        privateKey: process.env.JWT_SECRET,
+        expiresIn: '30d',
+      }),
+    };
   }
   // Function to check if a user is subscribed
   async checkSubscription(telegramId: string): Promise<boolean> {

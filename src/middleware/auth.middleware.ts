@@ -32,8 +32,9 @@ export class AuthMiddleware implements NestMiddleware {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  if(typeof decoded !== 'string') {
 
-      const userId = decoded.id;
+      const userId = decoded.userId;
 
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -44,6 +45,7 @@ export class AuthMiddleware implements NestMiddleware {
       }
 
       req.user = user;
+  }
     } catch (error) {
       console.error('Authentication error:', error);
       throw new UnauthorizedException('Invalid or expired token');

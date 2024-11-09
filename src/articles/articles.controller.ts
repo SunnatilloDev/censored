@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ArticlesService } from './articles.service';
 import {
@@ -14,11 +15,15 @@ import {
   RateArticleDto,
   ReportScamDto,
   UpdateArticleDto,
-} from 'src/articles/dto/index';
+} from './dto';
 import { ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/roles.enum';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('Articles')
 @Controller('articles')
+@UseGuards(RolesGuard)
 export class ArticlesController {
   constructor(private readonly articleService: ArticlesService) {}
 
@@ -30,6 +35,10 @@ export class ArticlesController {
   @Get()
   async getAllArticles() {
     return await this.articleService.getAllArticles();
+  }
+  @Get('search')
+  async searchArticles(@Query('query') query: string) {
+    return this.articleService.searchArticles(query);
   }
 
   @Get('top')
@@ -68,7 +77,7 @@ export class ArticlesController {
   ) {
     return await this.articleService.getArticle(articleId, Number(userId));
   }
-
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.OWNER)
   @Put(':id')
   async updateArticle(
     @Param('id') articleId: string,
@@ -76,7 +85,7 @@ export class ArticlesController {
   ) {
     return await this.articleService.updateArticle(articleId, updateData);
   }
-
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.OWNER)
   @Delete(':id')
   async deleteArticle(@Param('id') articleId: string) {
     return await this.articleService.deleteArticle(articleId);
@@ -98,5 +107,22 @@ export class ArticlesController {
   @Get(':id/scam-reports')
   async getScamReports(@Param('id') articleId: string) {
     return this.articleService.getScamReports(Number(articleId));
+  }
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.OWNER)
+
+  // New endpoint to remove a scam report
+  @Delete('scam-report/:reportId')
+  async removeScamReport(@Param('reportId') reportId: number) {
+    return this.articleService.removeScamReport(reportId);
+  }
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.OWNER)
+
+  // New endpoint to restore an article version
+  @Post(':id/restore-version/:versionId')
+  async restoreArticleVersion(
+    @Param('id') articleId: number,
+    @Param('versionId') versionId: number,
+  ) {
+    return this.articleService.restoreArticleVersion(articleId, versionId);
   }
 }

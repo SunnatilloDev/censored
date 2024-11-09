@@ -14,12 +14,21 @@ enum Role {
   USER
 }
 
+enum ArticleStatus {
+  DRAFT
+  MODERATED
+  PUBLISHED
+  ARCHIVED
+}
+
 model User {
   id            Int             @id @default(autoincrement())
   telegramId    String          @unique
   username      String?
   firstName     String?
   lastName      String?
+  status        String
+  lastOnline    DateTime?
   isSubscribed  Boolean         @default(false)
   photo_url     String?
   role          Role            @default(USER) // New field for roles
@@ -33,31 +42,44 @@ model User {
   AirdropView   AirdropView[]
   ArticleRating ArticleRating[]
   ScamReports   ScamReport[]
-  lastOnline    DateTime[]
 }
 
 model Article {
-  id            Int               @id @default(autoincrement())
-  title         String
-  subtitle      String?
-  content       Json
-  isActive      Boolean           @default(true)
-  conclusion    String?
-  publishDate   DateTime?
-  authorId      Int?
-  author        User?             @relation(fields: [authorId], references: [id])
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  categories    ArticleCategory[]
-  ArticleTag    ArticleTag[]
-  ArticleView   ArticleView[]
-  status        String            @default("Draft")
-  views         Int               @default(0)
-  avgRating     Float             @default(0)
-  totalRatings  Int               @default(0)
-  ArticleMedia  ArticleMedia[]
-  ScamReports   ScamReport[] // Ensure this is correctly defined
-  ArticleRating ArticleRating[]
+  id                   Int               @id @default(autoincrement())
+  title                String
+  subtitle             String?
+  content              Json
+  isActive             Boolean           @default(true)
+  conclusion           String?
+  publishDate          DateTime?
+  scheduledPublishDate DateTime? // Optional for scheduling publication
+  authorId             Int?
+  author               User?             @relation(fields: [authorId], references: [id])
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  categories           ArticleCategory[]
+  ArticleTag           ArticleTag[]
+  ArticleView          ArticleView[]
+  status               ArticleStatus     @default(DRAFT) // Enum for status
+  views                Int               @default(0)
+  avgRating            Float             @default(0)
+  totalRatings         Int               @default(0)
+  ArticleMedia         ArticleMedia[]
+  ScamReports          ScamReport[]
+  ArticleRating        ArticleRating[]
+  isEditorChoice       Boolean           @default(false) // Flag for editor's top pick
+  ArticleHistory       ArticleHistory[] // Optional, stores past versions if versioning is needed
+}
+
+model ArticleHistory {
+  id         Int      @id @default(autoincrement())
+  articleId  Int
+  article    Article  @relation(fields: [articleId], references: [id])
+  content    Json
+  title      String
+  subtitle   String?
+  conclusion String? // Add this line
+  updatedAt  DateTime @default(now())
 }
 
 model ScamReport {
@@ -88,12 +110,14 @@ model Airdrop {
 }
 
 model Task {
-  id          Int     @id @default(autoincrement())
-  name        String
+  id          Int       @id @default(autoincrement())
+  title       String
   description String
-  isCompleted Boolean @default(false)
   airdropId   Int
-  airdrop     Airdrop @relation(fields: [airdropId], references: [id])
+  airdrop     Airdrop   @relation(fields: [airdropId], references: [id])
+  type        String // Can be "General" or "Promo Code"
+  isCompleted Boolean   @default(false)
+  openingDate DateTime? // Only for "Promo Code" type tasks
 }
 
 model UserAirdrop {
@@ -143,6 +167,7 @@ model Category {
   id          Int               @id @default(autoincrement())
   name        String
   description String?
+  icon        String
   articles    ArticleCategory[]
 }
 
@@ -201,4 +226,13 @@ model AirdropView {
   airdrop   Airdrop @relation(fields: [airdropId], references: [id])
 
   @@id([userId, airdropId])
+}
+
+model Notification {
+  id            Int      @id @default(autoincrement())
+  type          String // Type of notification, e.g., "Ad Expiry" or "Article Review"
+  endDate       DateTime // Scheduled date for the notification
+  recipientRole Role[] // Array of recipient roles
+  message       String // Message content for the notification
+  createdAt     DateTime @default(now())
 }
