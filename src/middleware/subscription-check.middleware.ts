@@ -6,7 +6,7 @@ import {
 import { Response, NextFunction } from 'express';
 import { PrismaService } from 'src/prisma/prisma.service';
 import axios from 'axios';
-import { CreateUserDto } from 'src/users/dto/index';
+import { CreateUserDto } from '../users/dto';
 import { IncomingHttpHeaders } from 'http';
 
 interface Request {

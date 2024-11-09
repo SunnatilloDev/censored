@@ -13,9 +13,17 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CryptoArticle API')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'access-token',
+    )
     .setDescription('API documentation')
     .build();
+
   app.useGlobalGuards(new RolesGuard(new Reflector()));
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);

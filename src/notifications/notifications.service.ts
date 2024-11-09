@@ -27,7 +27,7 @@ export class NotificationsService {
 
   // Schedule a cron job to run every minute and check for due notifications
   private scheduleNotifications() {
-    cron.schedule('* * * * *', async () => {
+    cron.schedule('*/5 * * * *', async () => {
       await this.sendDueNotifications();
     });
   }
@@ -42,10 +42,16 @@ export class NotificationsService {
     });
 
     for (const notification of dueNotifications) {
-      await this.sendNotificationToRoles(notification);
+      try {
+        await this.sendNotificationToRoles(notification);
+        // Optionally mark as sent if needed
+      } catch (error) {
+        console.error(
+          `Error sending notification ID ${notification.id}:`,
+          error,
+        );
+      }
     }
-
-    // Optional: delete or update notifications after sending
   }
 
   // Send notifications to all users with specified roles

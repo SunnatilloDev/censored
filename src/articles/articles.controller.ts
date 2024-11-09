@@ -91,7 +91,20 @@ export class ArticlesController {
       JSON.parse(latest.toString()),
     );
   }
-
+  @Roles(Role.MODERATOR, Role.ADMIN)
+  @Get('moderated')
+  @ApiOperation({ summary: 'Get articles pending moderation approval' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of moderated articles awaiting approval.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden. Only moderators and admins can access.',
+  })
+  async getModeratedArticles() {
+    return this.articleService.getArticlesByStatus('MODERATED');
+  }
   @Post(':id/rate')
   @ApiOperation({ summary: 'Rate an article' })
   @ApiParam({ name: 'id', type: String, description: 'Article ID' })
@@ -213,5 +226,20 @@ export class ArticlesController {
     @Param('versionId') versionId: number,
   ) {
     return this.articleService.restoreArticleVersion(articleId, versionId);
+  }
+
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.OWNER)
+  @Put(':id/publish')
+  @ApiOperation({
+    summary: 'Publish an article by changing its status to PUBLISHED',
+  })
+  @ApiResponse({ status: 200, description: 'Article has been published.' })
+  @ApiResponse({ status: 404, description: 'Article not found.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden. Only moderators and admins can publish.',
+  })
+  async publishArticle(@Param('id') articleId: string) {
+    return await this.articleService.publishArticle(+articleId);
   }
 }

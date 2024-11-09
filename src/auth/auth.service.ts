@@ -2,6 +2,7 @@ import {
   Injectable,
   InternalServerErrorException,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
@@ -15,7 +16,46 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
+  async refreshAccessToken(refreshToken: string) {
+    try {
+      // Verify the refresh token
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_SECRET,
+      });
 
+      // Ensure the refresh token belongs to a valid user
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.userId },
+      });
+
+      if (!user) {
+        throw new ForbiddenException('User not found');
+      }
+
+      // Generate a new access token and refresh token
+      const newTokens = this.jwtGenerator({
+        userId: user.id,
+        email: user.username,
+      });
+
+      return newTokens;
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
+  jwtGenerator(payload) {
+    return {
+      accessToken: this.jwtService.sign(payload, {
+        privateKey: process.env.JWT_SECRET,
+        expiresIn: '15m',
+      }),
+      refreshToken: this.jwtService.sign(payload, {
+        privateKey: process.env.JWT_SECRET,
+        expiresIn: '30d',
+      }),
+    };
+  }
   // Function to verify and register a user
   async verifyAndRegisterUser(telegramData: any) {
     try {
@@ -27,11 +67,11 @@ export class AuthService {
         photo_url,
       } = telegramData;
 
-      // const isSubscribed = await this.checkSubscription(telegramId);
-      //
-      // if (!isSubscribed) {
-      //   return { isSubscribed: false };
-      // }
+      const isSubscribed = await this.checkSubscription(telegramId);
+
+      if (!isSubscribed) {
+        return { isSubscribed: false };
+      }
 
       const user = await this.prisma.user.upsert({
         where: { telegramId },
@@ -68,18 +108,7 @@ export class AuthService {
       );
     }
   }
-  jwtGenerator(payload) {
-    return {
-      accessToken: this.jwtService.sign(payload, {
-        privateKey: process.env.JWT_SECRET,
-        expiresIn: '15m',
-      }),
-      refreshToken: this.jwtService.sign(payload, {
-        privateKey: process.env.JWT_SECRET,
-        expiresIn: '30d',
-      }),
-    };
-  }
+
   // Function to check if a user is subscribed
   async checkSubscription(telegramId: string): Promise<boolean> {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;

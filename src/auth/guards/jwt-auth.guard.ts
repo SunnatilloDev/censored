@@ -6,23 +6,37 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import * as process from 'node:process';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private reflector: Reflector,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
+    // Check if route is public
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true; // Bypass JWT validation for public routes
+    }
+
     const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
-
+    console.log(request.headers);
     if (!token) {
       throw new UnauthorizedException('Access token is missing');
     }
 
     try {
-      // Verify token and attach payload to request
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
       });

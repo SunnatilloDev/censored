@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { ConfigModule as ConfigModuleFromNest } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -32,6 +32,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { StatusModule } from './status/status.module';
 import { TasksModule } from './tasks/tasks.module';
+import { AuthMiddleware } from './middleware/auth.middleware';
+import { SubscriptionCheckMiddleware } from './middleware/subscription-check.middleware';
 
 @Module({
   imports: [
@@ -71,14 +73,30 @@ import { TasksModule } from './tasks/tasks.module';
     NotificationsService,
     AdvertisementService,
     UploadService,
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: JwtAuthGuard,
-    // },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
   ],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      // Apply AuthMiddleware globally if all routes need authentication
+      .apply(AuthMiddleware)
+      .forRoutes('*')
+
+      // Restrict these specific routes based on subscription status
+      .apply(SubscriptionCheckMiddleware)
+      .forRoutes(
+        ArticlesController,
+        AirdropsController,
+        'advertisements/track',
+        'referrals',
+      );
+  }
+}

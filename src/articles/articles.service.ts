@@ -103,7 +103,7 @@ export class ArticlesService {
           content: articleData.content,
           conclusion: articleData.conclusion,
           authorId: articleData.authorId,
-          status: articleData.status.toUpperCase() as ArticleStatus,
+          status: ArticleStatus.MODERATED,
           categories: {
             connect: articleData.categories.map((categoryId) => ({
               id: categoryId,
@@ -123,7 +123,19 @@ export class ArticlesService {
       throw new InternalServerErrorException('Failed to create article.');
     }
   }
+  async getArticlesByStatus(status: string | ArticleStatus) {
+    return this.prisma.article.findMany({
+      where: { status: status as ArticleStatus },
+    });
+  }
 
+  async publishArticle(articleId: number) {
+    const article = await this.prisma.article.update({
+      where: { id: articleId },
+      data: { status: 'PUBLISHED' }, // Change status to PUBLISHED
+    });
+    return article;
+  }
   async searchArticles(query: string) {
     return this.prisma.article.findMany({
       where: {

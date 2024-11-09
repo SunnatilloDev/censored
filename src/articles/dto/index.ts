@@ -60,7 +60,6 @@ export class CreateArticleDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsArray()
-  @IsUrl({}, { each: true })
   mediaUrls?: string[];
 
   @ApiProperty({ required: false })
