@@ -24,6 +24,7 @@ export class AdvertisementService {
         },
       });
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException('Failed to create advertisement.');
     }
   }
