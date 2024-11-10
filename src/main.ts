@@ -5,6 +5,7 @@ import { config } from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
 import { RolesGuard } from './auth/guards/roles.guard'; // Use named import for RolesGuard
 import * as express from 'express';
+import * as process from 'node:process';
 
 config(); // Load environment variables
 
@@ -45,7 +46,7 @@ async function bootstrap() {
   app.use('/uploads', express.static('uploads'));
 
   // Start the application and listen on port 8080
-  await app.listen(8080);
+  await app.listen(process.env.PORT || 8080);
   console.log('Application is running on: http://localhost:8080');
 }
 
