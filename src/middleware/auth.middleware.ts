@@ -3,24 +3,20 @@ import {
   NestMiddleware,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Response, NextFunction } from 'express';
+import { Response, NextFunction, Request } from 'express';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as jwt from 'jsonwebtoken';
 import { CreateUserDto } from 'src/users/dto/index';
 import { IncomingHttpHeaders } from 'http';
 
-interface Request {
-  path: any;
-  user?: CreateUserDto;
-  headers: IncomingHttpHeaders;
-}
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(private readonly prisma: PrismaService) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
-    if (req.path.startsWith('/auth')) {
+
+    if (req.baseUrl.startsWith('/auth')) {
       return next();
     }
     if (!authHeader) {
@@ -46,7 +42,7 @@ export class AuthMiddleware implements NestMiddleware {
           throw new UnauthorizedException('User not found');
         }
 
-        req.user = user;
+        req['user'] = user;
       }
     } catch (error) {
       console.error('Authentication error:', error);
