@@ -10,6 +10,7 @@ import { CreateUserDto } from 'src/users/dto/index';
 import { IncomingHttpHeaders } from 'http';
 
 interface Request {
+  path: any;
   user?: CreateUserDto;
   headers: IncomingHttpHeaders;
 }
@@ -19,7 +20,9 @@ export class AuthMiddleware implements NestMiddleware {
 
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
-
+    if (req.path.startsWith('/auth')) {
+      return next();
+    }
     if (!authHeader) {
       throw new UnauthorizedException('No token provided');
     }
@@ -32,20 +35,19 @@ export class AuthMiddleware implements NestMiddleware {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  if(typeof decoded !== 'string') {
+      if (typeof decoded !== 'string') {
+        const userId = decoded.userId;
 
-      const userId = decoded.userId;
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
+        if (!user) {
+          throw new UnauthorizedException('User not found');
+        }
 
-      if (!user) {
-        throw new UnauthorizedException('User not found');
+        req.user = user;
       }
-
-      req.user = user;
-  }
     } catch (error) {
       console.error('Authentication error:', error);
       throw new UnauthorizedException('Invalid or expired token');
