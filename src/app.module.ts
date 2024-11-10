@@ -88,6 +88,7 @@ export class AppModule {
     consumer
       // Apply AuthMiddleware globally if all routes need authentication
       .apply(AuthMiddleware)
+      .exclude('/auth')
       .forRoutes('*')
 
       // Restrict these specific routes based on subscription status
