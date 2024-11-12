@@ -8,7 +8,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import * as jwt from 'jsonwebtoken';
 import { CreateUserDto } from 'src/users/dto/index';
 import { IncomingHttpHeaders } from 'http';
-
+// let publicRoutes = ['/auth/telegram/callback', '/'];
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(private readonly prisma: PrismaService) {}
@@ -16,9 +16,6 @@ export class AuthMiddleware implements NestMiddleware {
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
 
-    if (req.baseUrl.startsWith('/auth')) {
-      return next();
-    }
     if (!authHeader) {
       throw new UnauthorizedException('No token provided');
     }

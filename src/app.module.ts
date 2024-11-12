@@ -34,6 +34,7 @@ import { StatusModule } from './status/status.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AuthMiddleware } from './middleware/auth.middleware';
 import { SubscriptionCheckMiddleware } from './middleware/subscription-check.middleware';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { SubscriptionCheckMiddleware } from './middleware/subscription-check.mid
     ArticlesController,
     AirdropsController,
     CategoriesController,
+    AppController,
   ],
   providers: [
     JwtService,
@@ -88,7 +90,7 @@ export class AppModule {
     consumer
       // Apply AuthMiddleware globally if all routes need authentication
       .apply(AuthMiddleware)
-      .exclude('/auth')
+      .exclude('/auth/telegram/callback', '/')
       .forRoutes('*')
 
       // Restrict these specific routes based on subscription status
