@@ -31,7 +31,7 @@ async function bootstrap() {
 
   // Enable CORS with additional options (replace * with your frontend domain for production)
   app.enableCors({
-    origin: 'https://cripta-valuta.vercel.app',
+    origin: ['https://cripta-valuta.vercel.app', 'http://localhost:3000'],
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
