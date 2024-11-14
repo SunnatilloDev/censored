@@ -90,7 +90,7 @@ export class AppModule {
     consumer
       // Apply AuthMiddleware globally if all routes need authentication
       .apply(AuthMiddleware)
-      .exclude('/auth/telegram/callback', '/')
+      .exclude('/auth/telegram/callback', '/', '/auth/refresh-token')
       .forRoutes('*')
 
       // Restrict these specific routes based on subscription status
