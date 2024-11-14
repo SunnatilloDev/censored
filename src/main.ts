@@ -29,12 +29,12 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document); // Swagger UI available at /api/docs
 
-  // Enable CORS with additional options (replace * with your frontend domain for production)
+  // Enable CORS with dynamic origin configuration
   app.enableCors({
-    origin: ['https://cripta-valuta.vercel.app', 'http://localhost:8000'],
+    origin: process.env.CORS_ORIGIN || '*', // Allow dynamic origin from .env or allow all origins
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
-    allowedHeaders: '*',
-    credentials: true,
+    allowedHeaders: '*', // Allow all headers
+    credentials: true, // Enable cookies and auth headers
   });
 
   // Global validation pipe to automatically validate incoming data
@@ -48,7 +48,7 @@ async function bootstrap() {
 
   // Start the application and listen on port 8080
   await app.listen(process.env.PORT || 8080);
-  console.log('Application is running on: http://localhost:8080');
+  console.log('Application is running on:', await app.getUrl());
 }
 
 bootstrap();
