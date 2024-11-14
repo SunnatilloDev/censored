@@ -1,3 +1,4 @@
+// src/auth/middleware/auth.middleware.ts
 import {
   Injectable,
   NestMiddleware,
@@ -6,9 +7,10 @@ import {
 import { Response, NextFunction, Request } from 'express';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as jwt from 'jsonwebtoken';
-import { CreateUserDto } from 'src/users/dto/index';
-import { IncomingHttpHeaders } from 'http';
-// let publicRoutes = ['/auth/telegram/callback', '/'];
+
+// Define public routes that don’t require authentication
+const publicRoutes = ['/auth/telegram/callback', '/auth/refresh-token'];
+
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(private readonly prisma: PrismaService) {}
@@ -16,12 +18,16 @@ export class AuthMiddleware implements NestMiddleware {
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
 
+    // Skip middleware for public routes
+    if (publicRoutes.includes(req.path)) {
+      return next();
+    }
+
     if (!authHeader) {
       throw new UnauthorizedException('No token provided');
     }
 
     const token = authHeader.split(' ')[1];
-
     if (!token) {
       throw new UnauthorizedException('Invalid token format');
     }
@@ -40,6 +46,7 @@ export class AuthMiddleware implements NestMiddleware {
         }
 
         req['user'] = user;
+        next();
       }
     } catch (error) {
       console.error('Authentication error:', error);

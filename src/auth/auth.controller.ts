@@ -1,3 +1,4 @@
+// src/auth/auth.controller.ts
 import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto';
@@ -8,12 +9,15 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Public } from './decorators/public.decorator';
+import { Public } from './decorators/public.decorator'; // Importing the Public decorator
+import { Response } from 'express';
+
 @ApiTags('Auth')
 @Controller('auth')
 @ApiBearerAuth('access-token')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
   @Public()
   @Get('telegram/callback')
   async handleTelegramCallback(@Query() query: RegisterDto) {
@@ -32,6 +36,7 @@ export class AuthController {
       };
     }
   }
+
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiBody({
     schema: {
@@ -50,7 +55,6 @@ export class AuthController {
     @Res() res: Response,
   ) {
     const newTokens = await this.authService.refreshAccessToken(refreshToken);
-
-    return { accessToken: newTokens.accessToken };
+    return res.json({ accessToken: newTokens.accessToken });
   }
 }
