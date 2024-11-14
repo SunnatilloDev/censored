@@ -33,7 +33,7 @@ async function bootstrap() {
   app.enableCors({
     origin: ['https://cripta-valuta.vercel.app', 'http://localhost:8000'],
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization, Access-Control-Allow-Origin',
+    allowedHeaders: '*',
     credentials: true,
   });
 
