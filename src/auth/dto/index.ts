@@ -25,4 +25,12 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   photo_url?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  about?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  profileHeader?: string;
 }
