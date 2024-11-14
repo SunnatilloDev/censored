@@ -31,9 +31,10 @@ async function bootstrap() {
 
   // Enable CORS with Authorization header included explicitly
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*', // Allow dynamic origin from .env or allow all origins
+    origin: 'https://cripta-valuta.vercel.app', // Specific frontend origin
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization', // Explicitly include Authorization header
+    allowedHeaders: 'Content-Type, Authorization',
+    exposedHeaders: 'Authorization', // Expose Authorization for frontend access
     credentials: true, // Enable cookies and auth headers
   });
 
