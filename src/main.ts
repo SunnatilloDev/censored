@@ -29,13 +29,18 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document); // Swagger UI available at /api/docs
 
-  // Enable CORS with Authorization header included explicitly
+  // Enable CORS with detailed settings
   app.enableCors({
-    origin: 'https://cripta-valuta.vercel.app', // Specific frontend origin
-    methods: 'GET,POST,PUT,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization',
-    exposedHeaders: 'Authorization', // Expose Authorization for frontend access
-    credentials: true, // Enable cookies and auth headers
+    origin: ['https://cripta-valuta.vercel.app', 'http://localhost:8000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Access-Control-Allow-Origin',
+      'Access-Control-Allow-Headers',
+    ],
+    exposedHeaders: ['Authorization'],
+    credentials: true,
   });
 
   // Global validation pipe to automatically validate incoming data
@@ -47,7 +52,7 @@ async function bootstrap() {
   // Serve static files from the "uploads" folder
   app.use('/uploads', express.static('uploads'));
 
-  // Start the application and listen on port 8080
+  // Start the application and listen on the specified port
   await app.listen(process.env.PORT || 8080);
   console.log('Application is running on:', await app.getUrl());
 }

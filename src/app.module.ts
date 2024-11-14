@@ -94,7 +94,6 @@ export class AppModule {
       .forRoutes('*')
 
       // Restrict these specific routes based on subscription status
-      // Restrict these specific routes based on subscription status
       .apply(SubscriptionCheckMiddleware)
       .forRoutes(
         ArticlesController,
