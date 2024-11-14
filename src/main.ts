@@ -29,11 +29,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document); // Swagger UI available at /api/docs
 
-  // Enable CORS with dynamic origin configuration
+  // Enable CORS with Authorization header included explicitly
   app.enableCors({
     origin: process.env.CORS_ORIGIN || '*', // Allow dynamic origin from .env or allow all origins
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
-    allowedHeaders: '*', // Allow all headers
+    allowedHeaders: 'Content-Type, Authorization', // Explicitly include Authorization header
     credentials: true, // Enable cookies and auth headers
   });
 
