@@ -21,7 +21,7 @@ export class UploadService {
       // Write the file to the upload directory
       fs.writeFileSync(filePath, file.buffer);
 
-      return '/uploads/' + file.originalname;
+      return '/upload/' + file.originalname;
     } catch (error) {
       console.error('Error saving file:', error);
       throw new InternalServerErrorException('Failed to save file');
