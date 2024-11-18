@@ -30,7 +30,7 @@ async function bootstrap() {
 
   // Explicit CORS config with all options
   app.enableCors({
-    origin: process.env.CORS_ORIGIN, // Replace with your URL
+    origin: process.env.CORS_ORIGIN || 'https://cripta-valuta.vercel.app', // Replace with your URL
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS', // Allow all methods
     credentials: true, // Include credentials (if needed)
   });
