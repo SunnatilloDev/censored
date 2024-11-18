@@ -35,9 +35,22 @@ import { TasksModule } from './tasks/tasks.module';
 import { AuthMiddleware } from './middleware/auth.middleware';
 import { SubscriptionCheckMiddleware } from './middleware/subscription-check.middleware';
 import { AppController } from './app.controller';
+import { MulterModule } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { v4 } from 'uuid';
+import * as path from 'node:path';
 
 @Module({
   imports: [
+    MulterModule.register({
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const fileName = v4() + path.extname(file.originalname); // Generate unique name
+          cb(null, fileName);
+        },
+      }),
+    }),
     ConfigModuleFromNest.forRoot({
       isGlobal: true,
     }),
