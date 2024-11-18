@@ -16,7 +16,7 @@ export class UploadService {
 
   async saveFile(file: Express.Multer.File): Promise<string> {
     try {
-      const filePath = path.join(this.uploadDir, file.originalname + v4());
+      const filePath = path.join(this.uploadDir, v4() + file.originalname);
 
       // Write the file to the upload directory
       fs.writeFileSync(filePath, file.buffer);
