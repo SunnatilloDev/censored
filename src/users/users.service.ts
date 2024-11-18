@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { UpdateUserDto } from 'src/users/dto/index';
+import { UpdateUserDto } from './dto';
 import { UploadService } from 'src/upload/upload.service'; // Import the UploadService
 
 @Injectable()
@@ -27,7 +27,6 @@ export class UsersService {
       return {
         ...user,
         telegramId: undefined,
-        createdAt: undefined,
         updatedAt: undefined,
       };
     } catch (error) {
@@ -42,17 +41,15 @@ export class UsersService {
     try {
       let photoUrl: string | undefined;
 
-      // Handle photo upload if file is provided
       if (file) {
-        const filePath = await this.uploadService.saveFile(file);
-        photoUrl = filePath;
+        photoUrl = await this.uploadService.saveFile(file);
       }
 
       return await this.prisma.user.update({
         where: { id },
         data: {
           ...body,
-          photo_url: photoUrl || body.photo_url, // Update photo URL if a new file is uploaded
+          photo_url: photoUrl || body.photo_url,
         },
       });
     } catch (error) {

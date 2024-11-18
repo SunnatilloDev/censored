@@ -30,29 +30,10 @@ async function bootstrap() {
 
   // Explicit CORS config with all options
   app.enableCors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        ['https://cripta-valuta.vercel.app', 'http://localhost:8000'].includes(
-          origin,
-        )
-      ) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'Access-Control-Allow-Origin',
-    ],
-    exposedHeaders: ['Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 200,
+    origin: process.env.CORS_ORIGIN, // Replace with your URL
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS', // Allow all methods
+    credentials: true, // Include credentials (if needed)
   });
-
   app.useGlobalPipes(new ValidationPipe());
   app.useGlobalGuards(new RolesGuard(new Reflector()));
   app.use('/uploads', express.static('uploads'));
