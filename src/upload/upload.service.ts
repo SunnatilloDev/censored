@@ -1,28 +1,28 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import * as fs from 'fs';
+import * as fs from 'fs/promises'; // Using promises for non-blocking operations
 import * as path from 'path';
 import { v4 } from 'uuid';
 
 @Injectable()
 export class UploadService {
-  private readonly uploadDir = path.join(__dirname, '..', '..', 'uploads'); // Specify the uploads directory
+  private readonly uploadDir = path.join(__dirname, '..', '..', 'uploads');
 
   constructor() {
-    // Ensure the upload directory exists
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-    }
+    // Ensure the upload directory exists during service initialization
+    fs.mkdir(this.uploadDir, { recursive: true }).catch((err) => {
+      console.error('Error creating upload directory:', err);
+    });
   }
 
   async saveFile(file: Express.Multer.File): Promise<string> {
     try {
-      const fileName = v4() + file.originalname;
+      const fileName = v4() + path.extname(file.originalname); // Generate a unique file name
       const filePath = path.join(this.uploadDir, fileName);
 
-      // Write the file to the upload directory
-      fs.writeFileSync(filePath, file.buffer);
+      // Save the file buffer to the uploads directory
+      await fs.writeFile(filePath, file.buffer);
 
-      return '/upload/' + fileName;
+      return `/upload/${fileName}`; // Return the relative path for static serving
     } catch (error) {
       console.error('Error saving file:', error);
       throw new InternalServerErrorException('Failed to save file');
