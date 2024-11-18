@@ -36,7 +36,7 @@ async function bootstrap() {
   });
   app.useGlobalPipes(new ValidationPipe());
   app.useGlobalGuards(new RolesGuard(new Reflector()));
-  app.use('/uploads', express.static('uploads'));
+  app.use('/upload', express.static('uploads'));
 
   await app.listen(process.env.PORT || 8080);
   console.log('Application is running on:', await app.getUrl());
