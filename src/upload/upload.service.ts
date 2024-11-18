@@ -16,12 +16,13 @@ export class UploadService {
 
   async saveFile(file: Express.Multer.File): Promise<string> {
     try {
-      const filePath = path.join(this.uploadDir, v4() + file.originalname);
+      const fileName = v4() + file.originalname;
+      const filePath = path.join(this.uploadDir, fileName);
 
       // Write the file to the upload directory
       fs.writeFileSync(filePath, file.buffer);
 
-      return '/upload/' + file.originalname;
+      return '/upload/' + fileName;
     } catch (error) {
       console.error('Error saving file:', error);
       throw new InternalServerErrorException('Failed to save file');
