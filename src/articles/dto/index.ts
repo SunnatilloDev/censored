@@ -65,7 +65,7 @@ export class CreateArticleDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsArray()
-  tags?: number[];
+  tags?: string[];
 
   @ApiProperty({ required: false, example: [1, 2, 3] })
   @IsOptional()

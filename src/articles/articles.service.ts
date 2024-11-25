@@ -65,6 +65,7 @@ export class ArticlesService {
   }
 
   // Create an article
+  // Create an article
   async createArticle(articleData: CreateArticleDto) {
     try {
       const authorExists = await this.prisma.user.findUnique({
@@ -73,26 +74,6 @@ export class ArticlesService {
 
       if (!authorExists) {
         throw new BadRequestException('The author must be a valid user ID.');
-      }
-
-      // Check if all categories exist
-      const existingCategories = await this.prisma.category.findMany({
-        where: {
-          id: { in: articleData.categories },
-        },
-      });
-
-      if (existingCategories.length !== articleData.categories.length) {
-        throw new BadRequestException('One or more categories are invalid.');
-      }
-      const existingTags = await this.prisma.tag.findMany({
-        where: {
-          id: { in: articleData.categories },
-        },
-      });
-
-      if (existingTags.length !== articleData.tags.length) {
-        throw new BadRequestException('One or more tags are invalid.');
       }
 
       // Proceed with creating the article
@@ -109,11 +90,7 @@ export class ArticlesService {
               id: categoryId,
             })),
           },
-          ArticleTag: {
-            create: articleData.tags?.map((tagId) => ({
-              tag: { connect: { id: Number(tagId) } },
-            })),
-          },
+          tags: articleData.tags?.join(','), // Save tags as a comma-separated string
         },
       });
     } catch (error) {
@@ -123,6 +100,7 @@ export class ArticlesService {
       throw new InternalServerErrorException('Failed to create article.');
     }
   }
+
   async getArticlesByStatus(status: string | ArticleStatus) {
     return this.prisma.article.findMany({
       where: { status: status as ArticleStatus },
@@ -202,11 +180,11 @@ export class ArticlesService {
       const id = parseInt(articleId);
       if (isNaN(id)) throw new BadRequestException('Invalid article ID');
 
+      // Fetch the article along with categories, author, and ratings
       const article = await this.prisma.article.findUnique({
         where: { id },
         include: {
           author: true,
-          ArticleTag: { include: { tag: true } },
           categories: { include: { category: true } },
           ArticleView: true,
           ArticleRating: true,
@@ -219,22 +197,25 @@ export class ArticlesService {
 
       console.log('Article fetched:', article);
 
+      // Increment views
       await this.incrementArticleViews(id, userId);
 
-      const tags =
-        article.ArticleTag?.map((tagRelation) => tagRelation.tag.name) || [];
+      // Process categories
       const categories =
         article.categories?.map((catRelation) => catRelation.category.name) ||
         [];
+
+      // Calculate average rating
       const avgRating =
         article.ArticleRating.reduce(
           (total, rating) => total + rating.rating,
           0,
         ) / article.ArticleRating.length;
 
+      // Return the transformed article data
       return {
         ...transformArticleData(article),
-        tags,
+        tags: article.tags?.split(',') || [], // Convert the string back to an array
         categories,
         avgRating: avgRating || 0,
       };
@@ -259,6 +240,7 @@ export class ArticlesService {
       // Save the current version before updating
       await this.saveArticleVersion(id);
 
+      // Update the article
       return await this.prisma.article.update({
         where: { id },
         data: {
@@ -271,16 +253,11 @@ export class ArticlesService {
               id: categoryId,
             })),
           },
-          ArticleTag: {
-            create: updateData.tags?.map((tagId) => ({
-              tag: {
-                connect: { id: Number(tagId) },
-              },
-            })),
-          },
+          tags: updateData.tags?.join(','), // Convert the tags array into a comma-separated string
         },
       });
     } catch (error) {
+      console.error('Error in updateArticle:', error);
       throw new InternalServerErrorException('Failed to update article.');
     }
   }
