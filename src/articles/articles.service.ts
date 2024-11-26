@@ -63,7 +63,6 @@ export class ArticlesService {
       );
     }
   }
-
   async createArticle(articleData: CreateArticleDto) {
     try {
       const authorExists = await this.prisma.user.findUnique({
@@ -72,6 +71,19 @@ export class ArticlesService {
 
       if (!authorExists) {
         throw new BadRequestException('The author must be a valid user ID.');
+      }
+
+      // Validate categories
+      const existingCategories = await this.prisma.category.findMany({
+        where: {
+          id: { in: articleData.categories },
+        },
+      });
+
+      if (existingCategories.length !== articleData.categories.length) {
+        throw new BadRequestException(
+          'One or more categories do not exist in the database.',
+        );
       }
 
       // Proceed with creating the article
