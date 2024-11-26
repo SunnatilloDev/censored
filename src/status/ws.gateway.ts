@@ -7,7 +7,15 @@ import {
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
 
-@WebSocketGateway({ namespace: '/status' })
+@WebSocketGateway({
+  namespace: '/status',
+  cors: {
+    origin: ['https://cripta-valuta.vercel.app', 'http://localhost:3000'], // Replace with your allowed frontend domains
+    methods: ['GET', 'POST'],
+    credentials: true,
+    allowedHeaders: ['Authorization', 'Content-Type'],
+  },
+})
 export class StatusGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   users = new Map<string, { userId: number; lastOnline: Date }>();
