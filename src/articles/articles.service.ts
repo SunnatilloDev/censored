@@ -83,7 +83,9 @@ export class ArticlesService {
           subtitle: articleData.subtitle,
           content: articleData.content,
           conclusion: articleData.conclusion,
-          authorId: articleData.authorId,
+          author: {
+            connect: { id: articleData.authorId }, // Use `author` relation instead of `authorId`
+          },
           status: ArticleStatus.MODERATED,
           categories: {
             connect: articleData.categories.map((categoryId) => ({
