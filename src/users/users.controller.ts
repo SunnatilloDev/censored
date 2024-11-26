@@ -11,6 +11,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto';
 import { UsersService } from 'src/users/users.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/roles.enum';
 
 @ApiTags('Users')
 @Controller('users')
@@ -22,6 +24,11 @@ export class UsersController {
     return await this.usersService.getOneById(Number(id));
   }
 
+  @Get()
+  @Roles(Role.MODERATOR, Role.ADMIN, Role.OWNER)
+  async getAll() {
+    return this.usersService.getAll();
+  }
   @Put(':id')
   @UseInterceptors(FileInterceptor('file')) // Interceptor for handling file upload
   async updateOne(

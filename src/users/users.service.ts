@@ -13,7 +13,9 @@ export class UsersService {
     private prisma: PrismaService,
     private uploadService: UploadService, // Inject UploadService
   ) {}
-
+  async getAll() {
+    return this.prisma.user.findMany();
+  }
   async getOneById(id: number) {
     try {
       const user = await this.prisma.user.findUnique({
