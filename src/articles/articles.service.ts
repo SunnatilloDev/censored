@@ -64,8 +64,6 @@ export class ArticlesService {
     }
   }
 
-  // Create an article
-  // Create an article
   async createArticle(articleData: CreateArticleDto) {
     try {
       const authorExists = await this.prisma.user.findUnique({
@@ -82,9 +80,8 @@ export class ArticlesService {
           title: articleData.title,
           subtitle: articleData.subtitle,
           content: articleData.content,
-          conclusion: articleData.conclusion,
           author: {
-            connect: { id: articleData.authorId }, // Use `author` relation instead of `authorId`
+            connect: { id: articleData.authorId },
           },
           status: ArticleStatus.MODERATED,
           categories: {
