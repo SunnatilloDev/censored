@@ -2,8 +2,7 @@ export default function transformArticleData(rawArticle) {
   // Parse the content JSON string to actual JSON
 
   // Map through tags and categories to get simple arrays
-  const tags =
-    rawArticle.ArticleTag?.map((tagRelation) => tagRelation.tag.name) || [];
+  const tags = rawArticle.tags.split(',') || [];
   const categories =
     rawArticle.categories?.map((catRelation) => catRelation.category.name) ||
     [];
