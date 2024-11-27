@@ -36,5 +36,6 @@ export default function transformArticleData(rawArticle) {
     avgRating: avgRating,
     createdAt: rawArticle.createdAt,
     updatedAt: rawArticle.updatedAt,
+    conclusion: rawArticle.conclusion,
   };
 }
