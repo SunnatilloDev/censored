@@ -63,4 +63,8 @@ export class UpdateUserDto {
   @IsBoolean()
   @IsOptional()
   isSubscribed?: boolean;
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  isBlocked?: boolean;
 }

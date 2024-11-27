@@ -24,7 +24,10 @@ export class CreateArticleDto {
   @IsNotEmpty()
   @MaxLength(100)
   title: string;
-
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  poster: string;
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()

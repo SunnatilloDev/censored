@@ -54,6 +54,7 @@ model Article {
   subtitle             String?
   content              String
   isActive             Boolean           @default(true)
+  poster               String            @default("")
   conclusion           String?
   publishDate          DateTime?
   scheduledPublishDate DateTime?
