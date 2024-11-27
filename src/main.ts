@@ -28,10 +28,9 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: '*',
+    origin: ['https://cripta-valuta.vercel.app', 'http://localhost:8000'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: '*',
   });
 
   // Global Middleware
