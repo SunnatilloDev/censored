@@ -103,6 +103,9 @@ export class ArticlesService {
           },
           tags: articleData.tags?.join(','), // Save tags as a comma-separated string
         },
+        include: {
+          categories: true,
+        },
       });
     } catch (error) {
       if (error instanceof BadRequestException) {
