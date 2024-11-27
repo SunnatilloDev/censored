@@ -78,7 +78,7 @@ model ArticleHistory {
   id         Int      @id @default(autoincrement())
   articleId  Int
   article    Article  @relation(fields: [articleId], references: [id])
-  content    Json
+  content    String
   title      String
   subtitle   String?
   conclusion String? // Add this line
