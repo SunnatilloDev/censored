@@ -65,6 +65,7 @@ export class ArticlesService {
   }
   async createArticle(articleData: CreateArticleDto) {
     try {
+      // Check if the author exists
       const authorExists = await this.prisma.user.findUnique({
         where: { id: articleData.authorId },
       });
@@ -74,19 +75,21 @@ export class ArticlesService {
       }
 
       // Validate categories
-      const existingCategories = await this.prisma.category.findMany({
-        where: {
-          id: { in: articleData.categories },
-        },
-      });
+      if (articleData.categories && articleData.categories.length > 0) {
+        const existingCategories = await this.prisma.category.findMany({
+          where: {
+            id: { in: articleData.categories },
+          },
+        });
 
-      if (existingCategories.length !== articleData.categories.length) {
-        throw new BadRequestException(
-          'One or more categories do not exist in the database.',
-        );
+        if (existingCategories.length !== articleData.categories.length) {
+          throw new BadRequestException(
+            'One or more categories do not exist in the database.',
+          );
+        }
       }
 
-      // Proceed with creating the article
+      // Create the article
       return await this.prisma.article.create({
         data: {
           title: articleData.title,
@@ -97,12 +100,14 @@ export class ArticlesService {
             connect: { id: articleData.authorId },
           },
           status: ArticleStatus.MODERATED,
-          categories: {
-            connect: articleData.categories.map((categoryId) => ({
-              id: categoryId,
-            })),
-          },
-          tags: articleData.tags?.join(','), // Save tags as a comma-separated string
+          categories: articleData.categories
+            ? {
+                create: articleData.categories.map((categoryId) => ({
+                  category: { connect: { id: categoryId } },
+                })),
+              }
+            : undefined,
+          tags: articleData.tags?.join(','),
         },
         include: {
           categories: true,
@@ -112,6 +117,7 @@ export class ArticlesService {
       if (error instanceof BadRequestException) {
         throw error;
       }
+      console.error('Error in createArticle:', error);
       throw new InternalServerErrorException('Failed to create article.');
     }
   }
