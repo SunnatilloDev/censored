@@ -28,6 +28,7 @@ model User {
   firstName     String?
   lastName      String?
   status        String
+  isBlocked     Boolean         @default(false)
   lastOnline    DateTime?
   isSubscribed  Boolean         @default(false)
   photo_url     String?
