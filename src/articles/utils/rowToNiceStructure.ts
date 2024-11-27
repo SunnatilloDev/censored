@@ -1,6 +1,5 @@
 export default function transformArticleData(rawArticle) {
   // Parse the content JSON string to actual JSON
-  const content = JSON.parse(rawArticle.content || '[]');
 
   // Map through tags and categories to get simple arrays
   const tags =
@@ -25,17 +24,10 @@ export default function transformArticleData(rawArticle) {
 
   // Return the transformed data
   return {
-    id: rawArticle.id,
-    title: rawArticle.title,
-    content: content, // Parsed content as JSON
-    views: rawArticle.views,
-    isActive: rawArticle.isActive,
+    ...rawArticle,
     tags: tags,
     categories: categories,
     author: author,
     avgRating: avgRating,
-    createdAt: rawArticle.createdAt,
-    updatedAt: rawArticle.updatedAt,
-    conclusion: rawArticle.conclusion,
   };
 }
