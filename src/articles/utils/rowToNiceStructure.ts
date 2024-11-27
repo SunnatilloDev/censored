@@ -24,7 +24,14 @@ export default function transformArticleData(rawArticle) {
 
   // Return the transformed data
   return {
-    ...rawArticle,
+    id: rawArticle.id,
+    title: rawArticle.title,
+    content: rawArticle.content,
+    views: rawArticle.views,
+    isActive: rawArticle.isActive,
+    createdAt: rawArticle.createdAt,
+    updatedAt: rawArticle.updatedAt,
+    conclusion: rawArticle.conclusion,
     tags: tags,
     categories: categories,
     author: author,

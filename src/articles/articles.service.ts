@@ -92,6 +92,7 @@ export class ArticlesService {
           title: articleData.title,
           subtitle: articleData.subtitle,
           content: articleData.content,
+          conclusion: articleData.conclusion,
           author: {
             connect: { id: articleData.authorId },
           },
