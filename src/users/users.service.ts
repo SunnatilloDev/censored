@@ -14,7 +14,9 @@ export class UsersService {
     private uploadService: UploadService, // Inject UploadService
   ) {}
   async getAll() {
-    return this.prisma.user.findMany();
+    return this.prisma.user.findMany({
+      orderBy: { id: 'asc' },
+    });
   }
   async getOneById(id: number) {
     try {
