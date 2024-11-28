@@ -33,6 +33,7 @@ export default function transformArticleData(rawArticle) {
     authorId: rawArticle.authorId,
     conclusion: rawArticle.conclusion,
     poster: rawArticle.poster,
+    subtitle: rawArticle.subtitle,
     tags: tags,
     categories: categories,
     author: author,
