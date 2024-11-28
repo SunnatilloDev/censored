@@ -30,6 +30,7 @@ export default function transformArticleData(rawArticle) {
     isActive: rawArticle.isActive,
     createdAt: rawArticle.createdAt,
     updatedAt: rawArticle.updatedAt,
+    authorId: rawArticle.authorId,
     conclusion: rawArticle.conclusion,
     poster: rawArticle.poster,
     tags: tags,
