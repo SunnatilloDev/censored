@@ -31,6 +31,7 @@ export default function transformArticleData(rawArticle) {
     createdAt: rawArticle.createdAt,
     updatedAt: rawArticle.updatedAt,
     conclusion: rawArticle.conclusion,
+    poster: rawArticle.poster,
     tags: tags,
     categories: categories,
     author: author,
