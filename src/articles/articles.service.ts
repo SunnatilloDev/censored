@@ -304,6 +304,7 @@ export class ArticlesService {
         where: { id },
       });
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException('Failed to delete article.');
     }
   }
