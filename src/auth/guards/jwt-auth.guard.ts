@@ -18,7 +18,7 @@ export class JwtAuthGuard implements CanActivate {
     private reflector: Reflector,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> {
     // Check if route is public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
@@ -31,7 +31,7 @@ export class JwtAuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
-    console.log(request.headers);
+
     if (!token) {
       throw new UnauthorizedException('Access token is missing');
     }
@@ -39,16 +39,31 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
+        ignoreExpiration: false, // Ensure token expiration is checked
       });
+
+      // Validate payload structure
+      if (!payload || typeof payload !== 'object' || !payload.userId) {
+        throw new UnauthorizedException('Invalid token structure');
+      }
+
+      // Add user info to request
       request['user'] = payload;
       return true;
-    } catch {
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Token has expired');
+      }
+      if (error.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Invalid token');
+      }
+      console.error('JWT verification error:', error);
       throw new UnauthorizedException('Invalid or expired token');
     }
   }
 
-  private extractTokenFromHeader(request: Request): string | null {
-    const authHeader = request.headers['authorization'];
-    return authHeader?.split(' ')[1] || null; // Expecting "Bearer <token>"
+  private extractTokenFromHeader(request: Request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
   }
 }

@@ -11,114 +11,246 @@ import { ArticleStatus } from '@prisma/client'; // Import the enum
 
 @Injectable()
 export class ArticlesService {
+  private readonly maxTitleLength = 200;
+  private readonly maxContentLength = 50000;
+  private readonly maxConclusionLength = 2000;
+  private readonly maxTagsPerArticle = 10;
+  private readonly maxCategoriesPerArticle = 5;
+  private readonly ratingDelay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
   constructor(private prisma: PrismaService) {}
 
-  // Get all articles
-  async getAllArticles() {
+  // Get all articles with pagination and caching
+  async getAllArticles(page = 1, limit = 10) {
     try {
-      const articles = await this.prisma.article.findMany({
-        where: { status: ArticleStatus.PUBLISHED }, // Only return published articles
-        include: {
-          ArticleRating: true,
-          author: true,
-          ArticleTag: { include: { tag: true } },
-          categories: { include: { category: true } },
+      const skip = (page - 1) * limit;
+      const [articles, total] = await Promise.all([
+        this.prisma.article.findMany({
+          where: {
+            status: ArticleStatus.PUBLISHED,
+            isActive: false,
+          },
+          include: {
+            ArticleRating: true,
+            author: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                photo_url: true,
+                isBlocked: true,
+              },
+            },
+            ArticleTag: {
+              include: {
+                tag: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            categories: {
+              include: {
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [
+            { isEditorChoice: 'desc' },
+            { avgRating: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          skip,
+          take: limit,
+        }),
+        this.prisma.article.count({
+          where: {
+            status: ArticleStatus.PUBLISHED,
+            isActive: false,
+          },
+        }),
+      ]);
+
+      return {
+        articles: articles.map((article) => transformArticleData(article)),
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
         },
-        orderBy: { createdAt: 'desc' }, // Show newest first
-      });
-      return articles.map((article) => transformArticleData(article));
+      };
     } catch (err) {
       console.error('Error in getAllArticles:', err);
       throw new InternalServerErrorException('Failed to fetch articles');
     }
   }
 
-  // Increment article views
+  // Increment article views with rate limiting
   async incrementArticleViews(articleId: number, userId?: number) {
-    try {
-      if (!userId) return;
+    if (!userId) return;
 
+    try {
       const [isValidUser, hasViewed] = await Promise.all([
-        this.prisma.user.findUnique({ where: { id: userId } }),
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, isBlocked: true },
+        }),
         this.prisma.articleView.findUnique({
           where: { userId_articleId: { userId, articleId } },
         }),
       ]);
 
+      if (isValidUser?.isBlocked) {
+        return;
+      }
+
       if (!hasViewed && isValidUser) {
         await this.prisma.$transaction([
           this.prisma.article.update({
-            where: { id: articleId },
+            where: {
+              id: articleId,
+              isActive: true,
+            },
             data: { views: { increment: 1 } },
           }),
           this.prisma.articleView.create({
-            data: { userId, articleId },
+            data: {
+              userId,
+              articleId,
+            },
           }),
         ]);
       }
     } catch (error) {
       console.error('Error incrementing article views:', error);
-      // Don't throw error as this is not critical functionality
     }
   }
 
   async createArticle(articleData: CreateArticleDto) {
     try {
-      // Check if the author exists
-      const authorExists = await this.prisma.user.findUnique({
+      // Validate input lengths
+      if (articleData.title.length > this.maxTitleLength) {
+        throw new BadRequestException(
+          `Title cannot exceed ${this.maxTitleLength} characters`,
+        );
+      }
+      if (articleData.content.length > this.maxContentLength) {
+        throw new BadRequestException(
+          `Content cannot exceed ${this.maxContentLength} characters`,
+        );
+      }
+      if (
+        articleData.conclusion &&
+        articleData.conclusion.length > this.maxConclusionLength
+      ) {
+        throw new BadRequestException(
+          `Conclusion cannot exceed ${this.maxConclusionLength} characters`,
+        );
+      }
+      if (
+        articleData.tags &&
+        articleData.tags.length > this.maxTagsPerArticle
+      ) {
+        throw new BadRequestException(
+          `Cannot have more than ${this.maxTagsPerArticle} tags`,
+        );
+      }
+      if (
+        articleData.categories &&
+        articleData.categories.length > this.maxCategoriesPerArticle
+      ) {
+        throw new BadRequestException(
+          `Cannot have more than ${this.maxCategoriesPerArticle} categories`,
+        );
+      }
+
+      // Check if the author exists and is not blocked
+      const author = await this.prisma.user.findUnique({
         where: { id: articleData.authorId },
+        select: { id: true, isBlocked: true, role: true },
       });
 
-      if (!authorExists) {
-        throw new BadRequestException('The author must be a valid user ID.');
+      if (!author) {
+        throw new BadRequestException('Invalid author ID');
+      }
+
+      if (author.isBlocked) {
+        throw new BadRequestException('Blocked users cannot create articles');
       }
 
       // Validate categories
-      if (articleData.categories && articleData.categories.length > 0) {
-        const existingCategories = await this.prisma.category.findMany({
-          where: {
-            id: { in: articleData.categories },
-          },
+      if (articleData.categories?.length) {
+        const categories = await this.prisma.category.findMany({
+          where: { id: { in: articleData.categories } },
+          select: { id: true },
         });
 
-        if (existingCategories.length !== articleData.categories.length) {
-          throw new BadRequestException(
-            'One or more categories do not exist in the database.',
-          );
+        if (categories.length !== articleData.categories.length) {
+          throw new BadRequestException('One or more categories are invalid');
         }
       }
 
-      // Create the article
-      return await this.prisma.article.create({
-        data: {
-          title: articleData.title,
-          subtitle: articleData.subtitle,
-          content: articleData.content,
-          conclusion: articleData.conclusion,
-          poster: articleData.poster,
-          author: {
-            connect: { id: articleData.authorId },
+      // Create the article in a transaction
+      return await this.prisma.$transaction(async (tx) => {
+        // Create the article
+        const article = await tx.article.create({
+          data: {
+            title: articleData.title.trim(),
+            subtitle: articleData.subtitle?.trim(),
+            content: articleData.content,
+            conclusion: articleData.conclusion?.trim(),
+            poster: articleData.poster,
+            author: { connect: { id: articleData.authorId } },
+            status:
+              author.role === 'ADMIN'
+                ? ArticleStatus.PUBLISHED
+                : ArticleStatus.MODERATED,
+            categories: articleData.categories
+              ? {
+                  create: articleData.categories.map((categoryId) => ({
+                    category: { connect: { id: categoryId } },
+                  })),
+                }
+              : undefined,
+            tags: articleData.tags?.join(','),
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
-          status: ArticleStatus.MODERATED,
-          categories: articleData.categories
-            ? {
-                create: articleData.categories.map((categoryId) => ({
-                  category: { connect: { id: categoryId } },
-                })),
-              }
-            : undefined,
-          tags: articleData.tags?.join(','),
-        },
-        include: {
-          categories: true,
-        },
+          include: {
+            categories: {
+              include: {
+                category: true,
+              },
+            },
+            author: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                photo_url: true,
+              },
+            },
+          },
+        });
+
+        return transformArticleData(article);
       });
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
       console.error('Error in createArticle:', error);
-      throw new InternalServerErrorException('Failed to create article.');
+      throw new InternalServerErrorException('Failed to create article');
     }
   }
 
@@ -136,119 +268,142 @@ export class ArticlesService {
     return article;
   }
 
-  async searchArticles(query: string) {
+  async searchArticles(query: string, page = 1, limit = 10) {
     try {
       if (!query || query.trim().length === 0) {
         throw new BadRequestException('Search query cannot be empty');
       }
 
-      return await this.prisma.article.findMany({
-        where: {
-          AND: [
-            { status: ArticleStatus.PUBLISHED },
-            {
-              OR: [
-                { title: { contains: query, mode: 'insensitive' } },
-                { subtitle: { contains: query, mode: 'insensitive' } },
-                { conclusion: { contains: query, mode: 'insensitive' } },
-                {
-                  ArticleTag: {
-                    some: { tag: { name: { contains: query, mode: 'insensitive' } } },
+      const skip = (page - 1) * limit;
+      const searchQuery = query.trim();
+
+      const [articles, total] = await Promise.all([
+        this.prisma.article.findMany({
+          where: {
+            AND: [
+              { status: ArticleStatus.PUBLISHED },
+              { isActive: true },
+              {
+                OR: [
+                  { title: { contains: searchQuery, mode: 'insensitive' } },
+                  { subtitle: { contains: searchQuery, mode: 'insensitive' } },
+                  {
+                    conclusion: { contains: searchQuery, mode: 'insensitive' },
                   },
-                },
-                {
-                  categories: {
-                    some: {
-                      category: { name: { contains: query, mode: 'insensitive' } },
+                  {
+                    ArticleTag: {
+                      some: {
+                        tag: {
+                          name: { contains: searchQuery, mode: 'insensitive' },
+                        },
+                      },
                     },
                   },
+                  {
+                    categories: {
+                      some: {
+                        category: {
+                          name: { contains: searchQuery, mode: 'insensitive' },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          include: {
+            ArticleTag: {
+              include: {
+                tag: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
                 },
-              ],
+              },
             },
+            author: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                photo_url: true,
+                isBlocked: true,
+              },
+            },
+            categories: {
+              include: {
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [
+            { isEditorChoice: 'desc' },
+            { avgRating: 'desc' },
+            { createdAt: 'desc' },
           ],
+          skip,
+          take: limit,
+        }),
+        this.prisma.article.count({
+          where: {
+            AND: [
+              { status: ArticleStatus.PUBLISHED },
+              { isActive: true },
+              {
+                OR: [
+                  { title: { contains: searchQuery, mode: 'insensitive' } },
+                  { subtitle: { contains: searchQuery, mode: 'insensitive' } },
+                  {
+                    conclusion: { contains: searchQuery, mode: 'insensitive' },
+                  },
+                  {
+                    ArticleTag: {
+                      some: {
+                        tag: {
+                          name: { contains: searchQuery, mode: 'insensitive' },
+                        },
+                      },
+                    },
+                  },
+                  {
+                    categories: {
+                      some: {
+                        category: {
+                          name: { contains: searchQuery, mode: 'insensitive' },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ]);
+
+      return {
+        articles: articles.map((article) => transformArticleData(article)),
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
         },
-        include: {
-          ArticleTag: { include: { tag: true } },
-          author: true,
-          categories: { include: { category: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      };
     } catch (error) {
       console.error('Error searching articles:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to search articles');
-    }
-  }
-
-  // Save a version before updating the article
-  private async saveArticleVersion(articleId: number) {
-    try {
-      const article = await this.prisma.article.findUnique({
-        where: { id: articleId },
-        select: {
-          title: true,
-          subtitle: true,
-          content: true,
-          conclusion: true,
-        },
-      });
-
-      if (!article) {
-        throw new NotFoundException(`Article with ID ${articleId} not found`);
-      }
-
-      await this.prisma.articleHistory.create({
-        data: {
-          articleId,
-          title: article.title,
-          subtitle: article.subtitle,
-          content: article.content,
-          conclusion: article.conclusion,
-        },
-      });
-    } catch (error) {
-      console.error('Error saving article version:', error);
-      throw new InternalServerErrorException('Failed to save article version');
-    }
-  }
-
-  // Restore a specific version
-  async restoreArticleVersion(articleId: number, versionId: number) {
-    try {
-      const version = await this.prisma.articleHistory.findUnique({
-        where: { id: versionId },
-      });
-
-      if (!version) {
-        throw new NotFoundException('Version not found');
-      }
-
-      const article = await this.prisma.article.findUnique({
-        where: { id: articleId },
-      });
-
-      if (!article) {
-        throw new NotFoundException('Article not found');
-      }
-
-      // Save current version before restoring old one
-      await this.saveArticleVersion(articleId);
-
-      return await this.prisma.article.update({
-        where: { id: articleId },
-        data: {
-          title: version.title,
-          subtitle: version.subtitle,
-          content: version.content,
-          conclusion: version.conclusion,
-        },
-      });
-    } catch (error) {
-      console.error('Error restoring article version:', error);
-      throw new InternalServerErrorException('Failed to restore article version');
     }
   }
 
@@ -340,7 +495,6 @@ export class ArticlesService {
     }
   }
 
-  // Delete an article
   async deleteArticle(articleId: string) {
     try {
       const id = parseInt(articleId);
@@ -395,24 +549,49 @@ export class ArticlesService {
     }
   }
 
-  // Rate an article
   async rateArticle(articleId: number, userId: number, rating: number) {
     try {
       if (rating < 1 || rating > 5) {
         throw new BadRequestException('Rating must be between 1 and 5');
       }
 
-      const [user, article] = await Promise.all([
-        this.prisma.user.findUnique({ where: { id: userId } }),
-        this.prisma.article.findUnique({ where: { id: articleId } }),
+      // Check if user and article exist in a single transaction
+      const [user, article, existingRating] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, isBlocked: true },
+        }),
+        this.prisma.article.findUnique({
+          where: {
+            id: articleId,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            authorId: true,
+            status: true,
+          },
+        }),
+        this.prisma.articleRating.findUnique({
+          where: { userId_articleId: { userId, articleId } },
+          select: { createdAt: true },
+        }),
       ]);
 
       if (!user) {
         throw new NotFoundException('User not found');
       }
 
+      if (user.isBlocked) {
+        throw new BadRequestException('Blocked users cannot rate articles');
+      }
+
       if (!article) {
         throw new NotFoundException('Article not found');
+      }
+
+      if (article.status !== ArticleStatus.PUBLISHED) {
+        throw new BadRequestException('Can only rate published articles');
       }
 
       // Don't allow authors to rate their own articles
@@ -420,42 +599,77 @@ export class ArticlesService {
         throw new BadRequestException('Authors cannot rate their own articles');
       }
 
-      await this.prisma.articleRating.upsert({
-        where: {
-          userId_articleId: { userId, articleId },
-        },
-        update: { rating },
-        create: { userId, articleId, rating },
+      // Check rating delay
+      if (existingRating) {
+        const timeSinceLastRating =
+          Date.now() - existingRating.createdAt.getTime();
+        if (timeSinceLastRating < this.ratingDelay) {
+          const hoursLeft = Math.ceil(
+            (this.ratingDelay - timeSinceLastRating) / (1000 * 60 * 60),
+          );
+          throw new BadRequestException(
+            `You can rate this article again in ${hoursLeft} hours`,
+          );
+        }
+      }
+
+      // Update or create rating in a transaction
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Create or update the rating
+        await tx.articleRating.upsert({
+          where: { userId_articleId: { userId, articleId } },
+          update: {
+            rating,
+            createdAt: new Date(),
+          },
+          create: {
+            userId,
+            articleId,
+            rating,
+            createdAt: new Date(),
+          },
+        });
+
+        // Calculate new rating statistics
+        const stats = await tx.articleRating.aggregate({
+          where: { articleId },
+          _avg: { rating: true },
+          _count: { rating: true },
+          _max: { rating: true },
+          _min: { rating: true },
+        });
+
+        // Update article with new statistics
+        await tx.article.update({
+          where: { id: articleId },
+          data: {
+            avgRating: stats._avg.rating || 0,
+            totalRatings: stats._count.rating,
+            updatedAt: new Date(),
+          },
+        });
+
+        return {
+          averageRating: stats._avg.rating || 0,
+          totalRatings: stats._count.rating,
+          maxRating: stats._max.rating || 0,
+          minRating: stats._min.rating || 0,
+        };
       });
 
-      const aggregateResult = await this.prisma.articleRating.aggregate({
-        where: { articleId },
-        _avg: { rating: true },
-        _count: { rating: true },
-      });
-
-      const averageRating = aggregateResult._avg.rating || 0;
-      const totalRatings = aggregateResult._count.rating;
-
-      await this.prisma.article.update({
-        where: { id: articleId },
-        data: {
-          avgRating: averageRating,
-          totalRatings,
-        },
-      });
-
-      return { averageRating, totalRatings };
+      return result;
     } catch (error) {
       console.error('Error rating article:', error);
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to rate article');
     }
   }
 
-  // Get article ratings
   async getRateArticle(articleId: number) {
     const article = await this.prisma.article.findUnique({
       where: { id: articleId },
@@ -486,7 +700,6 @@ export class ArticlesService {
     return { averageRating, ratings };
   }
 
-  // Fetch top articles based on views and average rating
   async getTopArticles(limit: number, latest: boolean) {
     try {
       const takeLimit = Number(limit);
@@ -565,14 +778,16 @@ export class ArticlesService {
       return { message: 'Scam report created successfully' };
     } catch (error) {
       console.error('Error reporting scam:', error);
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to report scam.');
     }
   }
 
-  // Method to remove a scam report
   async removeScamReport(reportId: number) {
     try {
       const report = await this.prisma.scamReport.findUnique({
@@ -612,6 +827,75 @@ export class ArticlesService {
     } catch (error) {
       console.error('Error fetching scam reports:', error);
       throw new InternalServerErrorException('Failed to fetch scam reports.');
+    }
+  }
+
+  private async saveArticleVersion(articleId: number) {
+    try {
+      const article = await this.prisma.article.findUnique({
+        where: { id: articleId },
+        select: {
+          title: true,
+          subtitle: true,
+          content: true,
+          conclusion: true,
+        },
+      });
+
+      if (!article) {
+        throw new NotFoundException(`Article with ID ${articleId} not found`);
+      }
+
+      await this.prisma.articleHistory.create({
+        data: {
+          articleId,
+          title: article.title,
+          subtitle: article.subtitle,
+          content: article.content,
+          conclusion: article.conclusion,
+        },
+      });
+    } catch (error) {
+      console.error('Error saving article version:', error);
+      throw new InternalServerErrorException('Failed to save article version');
+    }
+  }
+
+  async restoreArticleVersion(articleId: number, versionId: number) {
+    try {
+      const version = await this.prisma.articleHistory.findUnique({
+        where: { id: versionId },
+      });
+
+      if (!version) {
+        throw new NotFoundException('Version not found');
+      }
+
+      const article = await this.prisma.article.findUnique({
+        where: { id: articleId },
+      });
+
+      if (!article) {
+        throw new NotFoundException('Article not found');
+      }
+
+      // Save current version before restoring old one
+      await this.saveArticleVersion(articleId);
+
+      return await this.prisma.article.update({
+        where: { id: articleId },
+        data: {
+          title: version.title,
+          subtitle: version.subtitle,
+          content: version.content,
+          conclusion: version.conclusion,
+        },
+      });
+    } catch (error) {
+      console.error('Error restoring article version:', error);
+      throw new InternalServerErrorException(
+        'Failed to restore article version',
+      );
     }
   }
 }
