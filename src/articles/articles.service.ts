@@ -296,15 +296,45 @@ export class ArticlesService {
         throw new NotFoundException(`Article with ID ${articleId} not found.`);
       }
 
-      await this.prisma.articleMedia.deleteMany({
-        where: { articleId: id },
-      });
+      // Delete all related records in a transaction
+      await this.prisma.$transaction([
+        // Delete article ratings
+        this.prisma.articleRating.deleteMany({
+          where: { articleId: id },
+        }),
+        // Delete article media
+        this.prisma.articleMedia.deleteMany({
+          where: { articleId: id },
+        }),
+        // Delete article categories
+        this.prisma.articleCategory.deleteMany({
+          where: { articleId: id },
+        }),
+        // Delete article tags
+        this.prisma.articleTag.deleteMany({
+          where: { articleId: id },
+        }),
+        // Delete article views
+        this.prisma.articleView.deleteMany({
+          where: { articleId: id },
+        }),
+        // Delete article history
+        this.prisma.articleHistory.deleteMany({
+          where: { articleId: id },
+        }),
+        // Delete scam reports
+        this.prisma.scamReport.deleteMany({
+          where: { articleId: id },
+        }),
+        // Finally delete the article
+        this.prisma.article.delete({
+          where: { id },
+        }),
+      ]);
 
-      return await this.prisma.article.delete({
-        where: { id },
-      });
+      return { message: 'Article deleted successfully' };
     } catch (error) {
-      console.log(error);
+      console.error('Error deleting article:', error);
       throw new InternalServerErrorException('Failed to delete article.');
     }
   }
