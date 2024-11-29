@@ -64,7 +64,7 @@ export class SubscriptionCheckMiddleware implements NestMiddleware {
 
       // If user is not subscribed in DB, check Telegram
       if (!user.isSubscribed) {
-        const isSubscribed = await this.checkTelegramSubscription(user.telegramId);
+        const isSubscribed = await this.checkTelegramSubscription(Number(user.telegramId));
         
         // Update cache and database
         this.subscriptionCache.set(userId, {
