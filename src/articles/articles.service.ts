@@ -17,52 +17,51 @@ export class ArticlesService {
   async getAllArticles() {
     try {
       const articles = await this.prisma.article.findMany({
+        where: { status: ArticleStatus.PUBLISHED }, // Only return published articles
         include: {
           ArticleRating: true,
           author: true,
           ArticleTag: { include: { tag: true } },
           categories: { include: { category: true } },
         },
+        orderBy: { createdAt: 'desc' }, // Show newest first
       });
       return articles.map((article) => transformArticleData(article));
     } catch (err) {
-      throw new InternalServerErrorException(err.message);
+      console.error('Error in getAllArticles:', err);
+      throw new InternalServerErrorException('Failed to fetch articles');
     }
   }
 
   // Increment article views
-  async incrementArticleViews(articleId: number, userId: number) {
+  async incrementArticleViews(articleId: number, userId?: number) {
     try {
       if (!userId) return;
 
-      const isValidUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      const hasViewed = await this.prisma.articleView.findUnique({
-        where: {
-          userId_articleId: { userId, articleId },
-        },
-      });
+      const [isValidUser, hasViewed] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: userId } }),
+        this.prisma.articleView.findUnique({
+          where: { userId_articleId: { userId, articleId } },
+        }),
+      ]);
 
       if (!hasViewed && isValidUser) {
-        await this.prisma.article.update({
-          where: { id: articleId },
-          data: {
-            views: { increment: 1 },
-          },
-        });
-
-        await this.prisma.articleView.create({
-          data: { userId, articleId },
-        });
+        await this.prisma.$transaction([
+          this.prisma.article.update({
+            where: { id: articleId },
+            data: { views: { increment: 1 } },
+          }),
+          this.prisma.articleView.create({
+            data: { userId, articleId },
+          }),
+        ]);
       }
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Failed to increment article views.',
-      );
+      console.error('Error incrementing article views:', error);
+      // Don't throw error as this is not critical functionality
     }
   }
+
   async createArticle(articleData: CreateArticleDto) {
     try {
       // Check if the author exists
@@ -136,66 +135,123 @@ export class ArticlesService {
     });
     return article;
   }
+
   async searchArticles(query: string) {
-    return this.prisma.article.findMany({
-      where: {
-        OR: [
-          { title: { contains: query, mode: 'insensitive' } },
-          {
-            ArticleTag: {
-              some: { tag: { name: { contains: query, mode: 'insensitive' } } },
+    try {
+      if (!query || query.trim().length === 0) {
+        throw new BadRequestException('Search query cannot be empty');
+      }
+
+      return await this.prisma.article.findMany({
+        where: {
+          AND: [
+            { status: ArticleStatus.PUBLISHED },
+            {
+              OR: [
+                { title: { contains: query, mode: 'insensitive' } },
+                { subtitle: { contains: query, mode: 'insensitive' } },
+                { conclusion: { contains: query, mode: 'insensitive' } },
+                {
+                  ArticleTag: {
+                    some: { tag: { name: { contains: query, mode: 'insensitive' } } },
+                  },
+                },
+                {
+                  categories: {
+                    some: {
+                      category: { name: { contains: query, mode: 'insensitive' } },
+                    },
+                  },
+                },
+              ],
             },
-          },
-          {
-            categories: {
-              some: {
-                category: { name: { contains: query, mode: 'insensitive' } },
-              },
-            },
-          },
-        ],
-      },
-      include: { ArticleTag: true, author: true },
-    });
+          ],
+        },
+        include: {
+          ArticleTag: { include: { tag: true } },
+          author: true,
+          categories: { include: { category: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      console.error('Error searching articles:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to search articles');
+    }
   }
+
   // Save a version before updating the article
   private async saveArticleVersion(articleId: number) {
-    const article = await this.prisma.article.findUnique({
-      where: { id: articleId },
-    });
-    if (article) {
+    try {
+      const article = await this.prisma.article.findUnique({
+        where: { id: articleId },
+        select: {
+          title: true,
+          subtitle: true,
+          content: true,
+          conclusion: true,
+        },
+      });
+
+      if (!article) {
+        throw new NotFoundException(`Article with ID ${articleId} not found`);
+      }
+
       await this.prisma.articleHistory.create({
         data: {
           articleId,
           title: article.title,
-
           subtitle: article.subtitle,
           content: article.content,
-          conclusion: article.conclusion, // This field now exists
+          conclusion: article.conclusion,
         },
       });
+    } catch (error) {
+      console.error('Error saving article version:', error);
+      throw new InternalServerErrorException('Failed to save article version');
     }
   }
 
   // Restore a specific version
   async restoreArticleVersion(articleId: number, versionId: number) {
-    // const version = await this.prisma.articleHistory.findUnique({
-    //   where: { id: versionId },
-    // });
-    // if (!version) throw new NotFoundException('Version not found');
-    //
-    // return this.prisma.article.update({
-    //   where: { id: articleId },
-    //   data: {
-    //     title: version.title,
-    //     subtitle: version.subtitle,
-    //     content: version.content,
-    //     conclusion: version.conclusion, // This field now exists
-    //   },
-    // });
+    try {
+      const version = await this.prisma.articleHistory.findUnique({
+        where: { id: versionId },
+      });
+
+      if (!version) {
+        throw new NotFoundException('Version not found');
+      }
+
+      const article = await this.prisma.article.findUnique({
+        where: { id: articleId },
+      });
+
+      if (!article) {
+        throw new NotFoundException('Article not found');
+      }
+
+      // Save current version before restoring old one
+      await this.saveArticleVersion(articleId);
+
+      return await this.prisma.article.update({
+        where: { id: articleId },
+        data: {
+          title: version.title,
+          subtitle: version.subtitle,
+          content: version.content,
+          conclusion: version.conclusion,
+        },
+      });
+    } catch (error) {
+      console.error('Error restoring article version:', error);
+      throw new InternalServerErrorException('Failed to restore article version');
+    }
   }
 
-  // Retrieve an article
   async getArticle(articleId: string, userId?: number) {
     console.log('getArticle invoked with articleId:', articleId);
     try {
@@ -341,40 +397,62 @@ export class ArticlesService {
 
   // Rate an article
   async rateArticle(articleId: number, userId: number, rating: number) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+    try {
+      if (rating < 1 || rating > 5) {
+        throw new BadRequestException('Rating must be between 1 and 5');
+      }
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+      const [user, article] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: userId } }),
+        this.prisma.article.findUnique({ where: { id: articleId } }),
+      ]);
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (!article) {
+        throw new NotFoundException('Article not found');
+      }
+
+      // Don't allow authors to rate their own articles
+      if (article.authorId === userId) {
+        throw new BadRequestException('Authors cannot rate their own articles');
+      }
+
+      await this.prisma.articleRating.upsert({
+        where: {
+          userId_articleId: { userId, articleId },
+        },
+        update: { rating },
+        create: { userId, articleId, rating },
+      });
+
+      const aggregateResult = await this.prisma.articleRating.aggregate({
+        where: { articleId },
+        _avg: { rating: true },
+        _count: { rating: true },
+      });
+
+      const averageRating = aggregateResult._avg.rating || 0;
+      const totalRatings = aggregateResult._count.rating;
+
+      await this.prisma.article.update({
+        where: { id: articleId },
+        data: {
+          avgRating: averageRating,
+          totalRatings,
+        },
+      });
+
+      return { averageRating, totalRatings };
+    } catch (error) {
+      console.error('Error rating article:', error);
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to rate article');
     }
-
-    await this.prisma.articleRating.upsert({
-      where: {
-        userId_articleId: { userId, articleId },
-      },
-      update: { rating },
-      create: { userId, articleId, rating },
-    });
-
-    const aggregateResult = await this.prisma.articleRating.aggregate({
-      where: { articleId },
-      _avg: { rating: true },
-      _count: { rating: true },
-    });
-
-    const averageRating = aggregateResult._avg.rating || 0;
-    const totalRatings = aggregateResult._count.rating;
-
-    await this.prisma.article.update({
-      where: { id: articleId },
-      data: {
-        avgRating: averageRating,
-        totalRatings,
-      },
-    });
-
-    return { averageRating, totalRatings };
   }
 
   // Get article ratings
@@ -442,6 +520,7 @@ export class ArticlesService {
       throw new InternalServerErrorException('Failed to fetch top articles.');
     }
   }
+
   async reportScam(
     articleId: number,
     reportedById: number,
@@ -449,12 +528,28 @@ export class ArticlesService {
     proof?: string,
   ) {
     try {
-      const article = await this.prisma.article.findUnique({
-        where: { id: articleId },
-      });
+      const [article, existingReport] = await Promise.all([
+        this.prisma.article.findUnique({
+          where: { id: articleId },
+        }),
+        this.prisma.scamReport.findFirst({
+          where: {
+            articleId,
+            reportedById,
+          },
+        }),
+      ]);
 
       if (!article) {
         throw new NotFoundException(`Article with ID ${articleId} not found.`);
+      }
+
+      if (existingReport) {
+        throw new BadRequestException('You have already reported this article');
+      }
+
+      if (!reason.trim()) {
+        throw new BadRequestException('Reason cannot be empty');
       }
 
       // Create a new ScamReport
@@ -469,6 +564,10 @@ export class ArticlesService {
 
       return { message: 'Scam report created successfully' };
     } catch (error) {
+      console.error('Error reporting scam:', error);
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
       throw new InternalServerErrorException('Failed to report scam.');
     }
   }
@@ -493,6 +592,7 @@ export class ArticlesService {
 
       return { message: 'Scam report removed successfully' };
     } catch (error) {
+      console.error('Error removing scam report:', error);
       throw new InternalServerErrorException('Failed to remove scam report.');
     }
   }
@@ -510,6 +610,7 @@ export class ArticlesService {
 
       return article.ScamReports;
     } catch (error) {
+      console.error('Error fetching scam reports:', error);
       throw new InternalServerErrorException('Failed to fetch scam reports.');
     }
   }
