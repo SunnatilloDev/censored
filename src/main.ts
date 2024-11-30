@@ -7,8 +7,17 @@ import * as compression from 'compression';
 import helmet from 'helmet';
 
 async function bootstrap() {
+  // Load env variables early
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  logger.log('Loading environment variables...');
+  
+  // Log the current working directory and NODE_ENV
+  logger.debug(`Current working directory: ${process.cwd()}`);
+  logger.debug(`NODE_ENV: ${process.env.NODE_ENV}`);
+  
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'debug', 'log', 'verbose'],
+  });
 
   // Security
   app.use(helmet());
