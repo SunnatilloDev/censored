@@ -12,12 +12,27 @@ import {
   FileTypeException,
 } from '../common/exceptions/custom.exceptions';
 
+const getMimeExtension = (mimeType: string) => {
+  switch (mimeType) {
+    case 'image/jpeg':
+      return '.jpg';
+    case 'image/png':
+      return '.png';
+    case 'image/gif':
+      return '.gif';
+    case 'image/webp':
+      return '.webp';
+    default:
+      return '';
+  }
+};
+
 @Module({
   imports: [
     MulterModule.register({
       storage: diskStorage({
         destination: (req, file, cb) => {
-          const uploadPath = './uploads';
+          const uploadPath = path.join(process.cwd(), 'uploads');
           try {
             if (!fs.existsSync(uploadPath)) {
               fs.mkdirSync(uploadPath, { recursive: true });
@@ -30,18 +45,36 @@ import {
         filename: (req, file, cb) => {
           try {
             const uniqueName = v4();
-            const extension = path.extname(file.originalname).toLowerCase();
-            cb(null, `${uniqueName}${extension}`);
+            const originalExt = path.extname(file.originalname).toLowerCase();
+            const extension = originalExt || getMimeExtension(file.mimetype);
+            
+            if (!extension) {
+              return cb(new FileUploadException('Invalid file type'), null);
+            }
+            
+            const filename = `${uniqueName}${extension}`;
+            cb(null, filename);
           } catch (error) {
             cb(new FileUploadException('Failed to generate filename'), null);
           }
         },
       }),
       fileFilter: (req, file, cb) => {
-        const allowedMimes = ['image/jpeg', 'image/png', 'image/gif'];
+        const allowedMimes = [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp'
+        ];
+        
+        if (!file.mimetype) {
+          return cb(new FileTypeException(allowedMimes), false);
+        }
+        
         if (!allowedMimes.includes(file.mimetype)) {
           return cb(new FileTypeException(allowedMimes), false);
         }
+        
         cb(null, true);
       },
       limits: {
