@@ -137,7 +137,6 @@ export class ArticlesService {
 
   async createArticle(articleData: CreateArticleDto) {
     try {
-      // Validate input lengths
       if (articleData.title.length > this.maxTitleLength) {
         throw new BadRequestException(
           `Title cannot exceed ${this.maxTitleLength} characters`,
