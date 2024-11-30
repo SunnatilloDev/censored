@@ -6,6 +6,7 @@ import {
   Logger,
   HttpStatus,
   UseFilters,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
@@ -18,6 +19,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { HttpExceptionFilter } from '../common/exceptions/http-exception.filter';
+import { FileUploadException } from '../common/exceptions/custom.exceptions';
 
 @ApiTags('Upload')
 @Controller('upload')
@@ -35,11 +37,12 @@ export class UploadController {
     description: 'Image file to upload (max 5MB)',
     schema: {
       type: 'object',
+      required: ['file'],
       properties: {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Image file (jpg, jpeg, png, gif)',
+          description: 'Image file (jpg, jpeg, png, gif, webp)',
         },
       },
     },
@@ -50,32 +53,34 @@ export class UploadController {
     schema: {
       type: 'object',
       properties: {
-        url: {
+        filename: {
           type: 'string',
-          description: 'URL of the uploaded file',
+          description: 'Name of the uploaded file',
+        },
+        path: {
+          type: 'string',
+          description: 'Path to access the file',
         },
       },
     },
   })
   @ApiResponse({ 
     status: HttpStatus.BAD_REQUEST, 
-    description: 'Invalid file or no file uploaded' 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.PAYLOAD_TOO_LARGE, 
-    description: 'File size exceeds 5MB limit' 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.UNSUPPORTED_MEDIA_TYPE, 
-    description: 'Invalid file type' 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.INTERNAL_SERVER_ERROR, 
-    description: 'Server error during upload' 
+    description: 'Invalid file upload request',
   })
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    this.logger.log(`Received upload request for file: ${file?.originalname}`);
-    const url = await this.uploadService.saveFile(file);
-    return { url };
+    if (!file) {
+      this.logger.error('File upload failed: No file provided');
+      throw new BadRequestException('File content is missing');
+    }
+
+    try {
+      const result = await this.uploadService.processUploadedFile(file);
+      this.logger.log(`File uploaded successfully: ${result.filename}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`File upload failed: ${error.message}`);
+      throw new FileUploadException(error.message);
+    }
   }
 }
