@@ -1,5 +1,4 @@
 import { MiddlewareConsumer, Module } from '@nestjs/common';
-import { ConfigModule as ConfigModuleFromNest } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CategoriesService } from './categories/categories.service';
@@ -16,10 +15,9 @@ import { CategoriesModule } from './categories/categories.module';
 import { AirdropsModule } from './airdrops/airdrops.module';
 import { ArticlesModule } from './articles/articles.module';
 import { UsersModule } from './users/users.module';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { BotModule } from './bot/bot.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsService } from './notifications/notifications.service';
 import { ReferralModule } from './referral/referral.module';
 import { AdvertisementService } from './advertisement/advertisement.service';
 import { AdvertisementModule } from './advertisement/advertisement.module';
@@ -41,9 +39,12 @@ import { v4 } from 'uuid';
 import * as path from 'node:path';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { ConfigModule } from './config/config.module';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Module({
   imports: [
+    ConfigModule,
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads',
