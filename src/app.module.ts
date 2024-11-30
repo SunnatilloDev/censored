@@ -39,6 +39,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { v4 } from 'uuid';
 import * as path from 'node:path';
+import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import * as path from 'node:path';
     UploadModule,
     StatusModule,
     TasksModule,
+    SubscriptionModule,
   ],
   controllers: [
     AuthController,
