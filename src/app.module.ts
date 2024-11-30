@@ -54,9 +54,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
         },
       }),
     }),
-    ConfigModuleFromNest.forRoot({
-      isGlobal: true,
-    }),
     AuthModule,
     UsersModule,
     ArticlesModule,
