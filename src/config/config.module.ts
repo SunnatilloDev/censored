@@ -20,7 +20,7 @@ logger.debug(`Loading environment from: ${envPath}`);
 logger.debug('Environment loaded:', {
   NODE_ENV: process.env.NODE_ENV,
   TELEGRAM_BOT_TOKEN_EXISTS: !!process.env.TELEGRAM_BOT_TOKEN,
-  TELEGRAM_CHAT_ID_EXISTS: !!process.env.TELEGRAM_CHAT_ID,
+  TELEGRAM_CHANNEL_ID_EXISTS: !!process.env.TELEGRAM_CHANNEL_ID,
   DATABASE_URL_EXISTS: !!process.env.DATABASE_URL,
 });
 
@@ -31,6 +31,25 @@ logger.debug('Environment loaded:', {
       cache: true,
       expandVariables: true,
       ignoreEnvFile: true, // We loaded it manually above
+      load: [
+        () => ({
+          server: {
+            env: process.env.NODE_ENV || 'development',
+            port: parseInt(process.env.PORT, 10) || 3000,
+            corsOrigin: process.env.CORS_ORIGIN,
+          },
+          telegram: {
+            botToken: process.env.TELEGRAM_BOT_TOKEN,
+            chatId: process.env.TELEGRAM_CHANNEL_ID,
+          },
+          database: {
+            url: process.env.DATABASE_URL,
+          },
+          jwt: {
+            secret: process.env.JWT_SECRET,
+          },
+        }),
+      ],
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
         PORT: Joi.number().default(3000),
@@ -41,34 +60,21 @@ logger.debug('Environment loaded:', {
           .when('NODE_ENV', {
             is: 'production',
             then: Joi.required(),
-            otherwise: Joi.optional()
+            otherwise: Joi.optional(),
           }),
-        TELEGRAM_CHAT_ID: Joi.string()
+        TELEGRAM_CHANNEL_ID: Joi.string()
           .when('NODE_ENV', {
             is: 'production',
             then: Joi.required(),
-            otherwise: Joi.optional()
+            otherwise: Joi.optional(),
           }),
+        JWT_SECRET: Joi.string().required(),
+        CORS_ORIGIN: Joi.string().required(),
       }),
       validationOptions: {
         abortEarly: true,
         allowUnknown: true,
       },
-      load: [
-        () => ({
-          database: {
-            url: process.env.DATABASE_URL,
-          },
-          telegram: {
-            botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-            chatId: process.env.TELEGRAM_CHAT_ID || '',
-          },
-          server: {
-            port: parseInt(process.env.PORT || '3000', 10),
-            env: process.env.NODE_ENV || 'development',
-          },
-        }),
-      ],
     }),
   ],
   exports: [NestConfigModule],

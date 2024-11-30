@@ -12,12 +12,18 @@ export class UploadService {
   private readonly logger = new Logger(UploadService.name);
   private readonly uploadDir = path.join(process.cwd(), 'uploads');
   private readonly maxFileSize = 5 * 1024 * 1024; // 5MB
-  private readonly allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  private readonly allowedExtensions = [
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+  ];
   private readonly allowedMimeTypes = [
     'image/jpeg',
     'image/png',
     'image/gif',
-    'image/webp'
+    'image/webp',
   ];
 
   constructor() {
@@ -59,13 +65,13 @@ export class UploadService {
     try {
       // File is already saved by Multer, just return the info
       const relativePath = path.relative(process.cwd(), file.path);
-      
+
       return {
         filename: file.filename,
         path: `/${relativePath.replace(/\\/g, '/')}`,
         originalname: file.originalname,
         mimetype: file.mimetype,
-        size: file.size
+        size: file.size,
       };
     } catch (error) {
       this.logger.error('Failed to process uploaded file:', error);
