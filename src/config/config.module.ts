@@ -3,7 +3,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
 import * as Joi from 'joi';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-
+dotenv.config();
 // Load .env file immediately
 const envPath = path.resolve(process.cwd(), '.env');
 const result = dotenv.config({ path: envPath });
@@ -42,19 +42,21 @@ logger.debug('Environment loaded:', {
         abortEarly: true,
         allowUnknown: true,
       },
-      load: [() => ({
-        database: {
-          url: process.env.DATABASE_URL,
-        },
-        telegram: {
-          botToken: process.env.TELEGRAM_BOT_TOKEN,
-          chatId: process.env.TELEGRAM_CHAT_ID,
-        },
-        server: {
-          port: parseInt(process.env.PORT || '3000', 10),
-          env: process.env.NODE_ENV,
-        },
-      })],
+      load: [
+        () => ({
+          database: {
+            url: process.env.DATABASE_URL,
+          },
+          telegram: {
+            botToken: process.env.TELEGRAM_BOT_TOKEN,
+            chatId: process.env.TELEGRAM_CHAT_ID,
+          },
+          server: {
+            port: parseInt(process.env.PORT || '3000', 10),
+            env: process.env.NODE_ENV,
+          },
+        }),
+      ],
     }),
   ],
   exports: [NestConfigModule],
