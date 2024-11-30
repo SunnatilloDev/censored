@@ -137,9 +137,10 @@ export class ArticlesService {
 
   async createArticle(articleData: CreateArticleDto) {
     try {
+      // Validate input lengths
       if (articleData.title.length > this.maxTitleLength) {
         throw new BadRequestException(
-          `Title cannot exceed ${this.maxTitleLength} characters`,
+          `Title cannot be longer than ${this.maxTitleLength} characters`,
         );
       }
       if (articleData.content.length > this.maxContentLength) {
@@ -175,7 +176,13 @@ export class ArticlesService {
       // Check if the author exists and is not blocked
       const author = await this.prisma.user.findUnique({
         where: { id: articleData.authorId },
-        select: { id: true, isBlocked: true, role: true },
+        select: {
+          id: true,
+          isBlocked: true,
+          role: true,
+          isSubscribed: true,
+          telegramId: true,
+        },
       });
 
       if (!author) {
@@ -184,6 +191,15 @@ export class ArticlesService {
 
       if (author.isBlocked) {
         throw new BadRequestException('Blocked users cannot create articles');
+      }
+
+      // Check subscription status for non-admin users
+      if (author.role !== 'OWNER' && author.role !== 'ADMIN') {
+        if (!author.isSubscribed) {
+          throw new BadRequestException(
+            'You must be subscribed to the channel to create articles. Please subscribe and try again.',
+          );
+        }
       }
 
       // Validate categories
