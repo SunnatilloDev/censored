@@ -102,7 +102,8 @@ export class UsersService {
       if (file) {
         try {
           // Upload new photo
-          photoUrl = await this.uploadService.saveFile(file);
+          const uploadResult = await this.uploadService.processUploadedFile(file);
+          photoUrl = uploadResult.path;
           
           // Delete old photo if it exists and is different
           if (user.photo_url && user.photo_url !== photoUrl) {

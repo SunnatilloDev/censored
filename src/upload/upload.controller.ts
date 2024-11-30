@@ -47,8 +47,8 @@ export class UploadController {
       },
     },
   })
-  @ApiResponse({ 
-    status: HttpStatus.CREATED, 
+  @ApiResponse({
+    status: HttpStatus.CREATED,
     description: 'File uploaded successfully',
     schema: {
       type: 'object',
@@ -64,8 +64,8 @@ export class UploadController {
       },
     },
   })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
     description: 'Invalid file upload request',
   })
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
