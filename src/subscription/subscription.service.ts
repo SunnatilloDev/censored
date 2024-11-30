@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import axios, { AxiosError } from 'axios';
 import {
   TelegramAPIException,
@@ -13,13 +14,12 @@ export class SubscriptionService {
   private readonly botToken: string;
   private readonly chatId: string;
 
-  constructor(private prisma: PrismaService) {
-    this.botToken = process.env.TELEGRAM_BOT_TOKEN;
-    this.chatId = process.env.TELEGRAM_CHAT_ID;
-
-    if (!this.botToken || !this.chatId) {
-      throw new Error('TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set');
-    }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {
+    this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+    this.chatId = this.configService.get<string>('TELEGRAM_CHAT_ID');
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -95,7 +95,8 @@ export class SubscriptionService {
   }
 
   private async checkTelegramSubscription(telegramId: string): Promise<boolean> {
-    if (!telegramId) {
+    if (!telegramId || !this.botToken || !this.chatId) {
+      this.logger.warn('Missing required Telegram configuration');
       return false;
     }
 
