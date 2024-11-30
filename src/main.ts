@@ -57,7 +57,7 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
 
   // Static files
-  app.use('uploads', express.static('uploads'));
+  app.use('/upload', express.static('uploads'));
 
   // Start server
   const port = process.env.PORT || 8080;
