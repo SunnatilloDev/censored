@@ -4,6 +4,8 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
@@ -19,12 +21,12 @@ import {
 @ApiTags('Upload')
 @Controller('upload')
 export class UploadController {
+  private readonly logger = new Logger(UploadController.name);
+
   constructor(private readonly uploadService: UploadService) {}
 
   @Post()
-  @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
-  ) // 5MB limit
+  @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload a file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -40,12 +42,35 @@ export class UploadController {
     },
   })
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
-  @ApiResponse({ status: 400, description: 'No file uploaded' })
-  @ApiResponse({ status: 500, description: 'Failed to save file' })
+  @ApiResponse({ status: 400, description: 'Invalid file or no file uploaded' })
+  @ApiResponse({ status: 500, description: 'Server error during upload' })
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('No file uploaded');
+    try {
+      if (!file) {
+        throw new BadRequestException('No file uploaded');
+      }
+
+      this.logger.log(`Attempting to upload file: ${file.originalname}`);
+      const result = await this.uploadService.saveFile(file);
+      this.logger.log(`Successfully uploaded file: ${result}`);
+      
+      return { url: result };
+    } catch (error) {
+      this.logger.error(`Upload failed: ${error.message}`, error.stack);
+      
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      
+      if (error.message.includes('Only image files are allowed')) {
+        throw new BadRequestException('Only image files are allowed');
+      }
+      
+      if (error.message.includes('File size exceeds')) {
+        throw new BadRequestException('File size exceeds 5MB limit');
+      }
+      
+      throw new InternalServerErrorException('Failed to upload file');
     }
-    return this.uploadService.saveFile(file);
   }
 }
