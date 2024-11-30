@@ -3,9 +3,9 @@ import {
   Post,
   UploadedFile,
   UseInterceptors,
-  BadRequestException,
-  InternalServerErrorException,
   Logger,
+  HttpStatus,
+  UseFilters,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
@@ -17,9 +17,11 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
+import { HttpExceptionFilter } from '../common/exceptions/http-exception.filter';
 
 @ApiTags('Upload')
 @Controller('upload')
+@UseFilters(HttpExceptionFilter)
 export class UploadController {
   private readonly logger = new Logger(UploadController.name);
 
@@ -27,50 +29,53 @@ export class UploadController {
 
   @Post()
   @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Upload a file' })
+  @ApiOperation({ summary: 'Upload an image file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'File to upload',
+    description: 'Image file to upload (max 5MB)',
     schema: {
       type: 'object',
       properties: {
         file: {
           type: 'string',
           format: 'binary',
+          description: 'Image file (jpg, jpeg, png, gif)',
         },
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid file or no file uploaded' })
-  @ApiResponse({ status: 500, description: 'Server error during upload' })
+  @ApiResponse({ 
+    status: HttpStatus.CREATED, 
+    description: 'File uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'URL of the uploaded file',
+        },
+      },
+    },
+  })
+  @ApiResponse({ 
+    status: HttpStatus.BAD_REQUEST, 
+    description: 'Invalid file or no file uploaded' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.PAYLOAD_TOO_LARGE, 
+    description: 'File size exceeds 5MB limit' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.UNSUPPORTED_MEDIA_TYPE, 
+    description: 'Invalid file type' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.INTERNAL_SERVER_ERROR, 
+    description: 'Server error during upload' 
+  })
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    try {
-      if (!file) {
-        throw new BadRequestException('No file uploaded');
-      }
-
-      this.logger.log(`Attempting to upload file: ${file.originalname}`);
-      const result = await this.uploadService.saveFile(file);
-      this.logger.log(`Successfully uploaded file: ${result}`);
-      
-      return { url: result };
-    } catch (error) {
-      this.logger.error(`Upload failed: ${error.message}`, error.stack);
-      
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      
-      if (error.message.includes('Only image files are allowed')) {
-        throw new BadRequestException('Only image files are allowed');
-      }
-      
-      if (error.message.includes('File size exceeds')) {
-        throw new BadRequestException('File size exceeds 5MB limit');
-      }
-      
-      throw new InternalServerErrorException('Failed to upload file');
-    }
+    this.logger.log(`Received upload request for file: ${file?.originalname}`);
+    const url = await this.uploadService.saveFile(file);
+    return { url };
   }
 }

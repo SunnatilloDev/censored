@@ -1,182 +1,94 @@
-import {
-  Injectable,
-  NestMiddleware,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { PrismaService } from 'src/prisma/prisma.service';
-import axios from 'axios';
-import { CreateUserDto } from '../users/dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { TelegramService } from '../telegram/telegram.service';
+import {
+  UnauthorizedException,
+  SubscriptionRequiredException,
+  SubscriptionVerificationException,
+  DatabaseException,
+} from '../common/exceptions/custom.exceptions';
+
+interface User {
+  id: number;
+  role: string;
+}
 
 interface RequestWithUser extends Request {
-  user?: CreateUserDto;
+  user?: User;
 }
 
 @Injectable()
 export class SubscriptionCheckMiddleware implements NestMiddleware {
-  private readonly cacheTimeout = 5 * 60 * 1000; // 5 minutes
-  private subscriptionCache = new Map<
-    number,
-    { status: boolean; timestamp: number }
-  >();
+  private readonly logger = new Logger(SubscriptionCheckMiddleware.name);
+  private readonly bypassRoles = ['ADMIN', 'OWNER'];
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly telegramService: TelegramService,
+  ) {}
 
   async use(req: RequestWithUser, res: Response, next: NextFunction) {
     try {
-      console.log(
-        'SubscriptionCheckMiddleware: Checking subscription for request',
-        {
-          path: req.url,
-          method: req.method,
-          userId: req.user?.id,
-        },
-      );
+      const user = req.user;
 
-      const userId = req.user?.id;
-      if (!userId) {
-        console.log('SubscriptionCheckMiddleware: No user ID found in request');
+      if (!user) {
         throw new UnauthorizedException('User not authenticated');
       }
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+      this.logger.debug(`Checking subscription for user ${user.id}`);
+
+      // Bypass check for admin roles
+      if (this.bypassRoles.includes(user.role)) {
+        this.logger.debug(`Bypassing subscription check for ${user.role} role`);
+        return next();
+      }
+
+      // Get user's telegram ID
+      const userWithTelegram = await this.prisma.user.findUnique({
+        where: { id: user.id },
         select: {
-          id: true,
           telegramId: true,
           isSubscribed: true,
-          isBlocked: true,
-          role: true,
         },
+      }).catch(error => {
+        this.logger.error(`Database error while fetching user: ${error.message}`);
+        throw new DatabaseException('Failed to fetch user data');
       });
 
-      if (!user) {
-        console.log('SubscriptionCheckMiddleware: User not found', { userId });
-        throw new UnauthorizedException('User not found');
+      if (!userWithTelegram?.telegramId) {
+        throw new SubscriptionRequiredException('Telegram ID not linked to account');
       }
 
-      console.log('SubscriptionCheckMiddleware: User found', {
-        userId,
-        role: user.role,
-        isBlocked: user.isBlocked,
-        isSubscribed: user.isSubscribed,
-      });
-
-      // Allow admins and owners to bypass subscription check
-      if (user.role === 'OWNER' || user.role === 'ADMIN') {
-        console.log('SubscriptionCheckMiddleware: Admin/Owner bypass');
-        return next();
-      }
-
-      // Block access for blocked users
-      if (user.isBlocked) {
-        console.log('SubscriptionCheckMiddleware: Blocked user detected', {
-          userId,
-        });
-        throw new UnauthorizedException('Your account has been blocked');
-      }
-
-      // Check cache first
-      const cached = this.subscriptionCache.get(userId);
-      if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-        console.log('SubscriptionCheckMiddleware: Using cached status', {
-          userId,
-          status: cached.status,
-          cacheAge: Date.now() - cached.timestamp,
+      // Verify subscription status
+      const isSubscribed = await this.telegramService
+        .checkSubscription(userWithTelegram.telegramId)
+        .catch(error => {
+          this.logger.error(`Telegram API error: ${error.message}`);
+          throw new SubscriptionVerificationException();
         });
 
-        if (!cached.status) {
-          throw new UnauthorizedException(
-            'You must be subscribed to access this content',
-          );
-        }
-        return next();
+      if (!isSubscribed) {
+        throw new SubscriptionRequiredException('User is not subscribed to the channel');
       }
 
-      // If user is not subscribed in DB, check Telegram
-      if (!user.isSubscribed) {
-        console.log(
-          'SubscriptionCheckMiddleware: Checking Telegram subscription',
-          {
-            userId,
-            telegramId: user.telegramId,
-          },
-        );
-
-        const isSubscribed = await this.checkTelegramSubscription(
-          Number(user.telegramId),
-        );
-
-        console.log(
-          'SubscriptionCheckMiddleware: Telegram subscription status',
-          {
-            userId,
-            isSubscribed,
-          },
-        );
-
-        // Update cache and database
-        this.subscriptionCache.set(userId, {
-          status: isSubscribed,
-          timestamp: Date.now(),
-        });
-
+      // Update subscription status in database if it has changed
+      if (!userWithTelegram.isSubscribed) {
         await this.prisma.user.update({
-          where: { id: userId },
+          where: { id: user.id },
           data: { isSubscribed },
+        }).catch(error => {
+          this.logger.error(`Failed to update subscription status: ${error.message}`);
+          // Don't throw here as the user is actually subscribed
+          this.logger.warn('Continuing despite database update failure');
         });
-
-        if (!isSubscribed) {
-          throw new UnauthorizedException(
-            'You must be subscribed to access this content',
-          );
-        }
       }
 
+      this.logger.debug(`Subscription check passed for user ${user.id}`);
       next();
     } catch (error) {
-      console.error('SubscriptionCheckMiddleware: Error', {
-        error: error.message,
-        stack: error.stack,
-      });
+      // Let the global exception filter handle the error
       throw error;
-    }
-  }
-
-  private async checkTelegramSubscription(
-    telegramId: number,
-  ): Promise<boolean> {
-    if (!telegramId) {
-      return false;
-    }
-
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const channelId = process.env.TELEGRAM_CHANNEL_ID;
-
-    if (!botToken || !channelId) {
-      console.error('Missing Telegram configuration');
-      return false;
-    }
-
-    try {
-      const response = await axios.get(
-        `https://api.telegram.org/bot${botToken}/getChatMember`,
-        {
-          params: {
-            chat_id: channelId,
-            user_id: telegramId,
-          },
-          timeout: 5000, // 5 second timeout
-        },
-      );
-
-      const { status } = response.data.result;
-      return ['member', 'administrator', 'creator'].includes(status);
-    } catch (error) {
-      console.error('Telegram API error:', error);
-      // On error, we'll be lenient and allow access
-      // This prevents blocking users due to temporary Telegram API issues
-      return true;
     }
   }
 }

@@ -1,7 +1,14 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpStatus } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { v4 } from 'uuid';
+import {
+  FileUploadException,
+  FileNotFoundException,
+  FileSizeLimitException,
+  FileTypeException,
+  FileSystemException,
+} from '../common/exceptions/custom.exceptions';
 
 @Injectable()
 export class UploadService {
@@ -27,12 +34,16 @@ export class UploadService {
       }, 60 * 60 * 1000); // Run every hour
     } catch (error) {
       this.logger.error('Failed to initialize upload directory:', error);
-      throw new InternalServerErrorException('Failed to initialize upload system');
+      throw new FileSystemException('Failed to initialize upload system');
     }
   }
 
   async saveFile(file: Express.Multer.File): Promise<string> {
     try {
+      if (!file) {
+        throw new FileUploadException('No file provided', HttpStatus.BAD_REQUEST);
+      }
+
       this.logger.log(`Processing upload: ${file.originalname}`);
       
       // Validate file
@@ -43,45 +54,57 @@ export class UploadService {
       const fileName = `${v4()}${extension}`;
       const filePath = path.join(this.uploadDir, fileName);
 
-      // Save the file
-      await fs.writeFile(filePath, file.buffer);
-      this.logger.log(`File saved: ${fileName}`);
+      try {
+        // Save the file
+        await fs.writeFile(filePath, file.buffer);
+        this.logger.log(`File saved: ${fileName}`);
 
-      // Verify the file was written correctly
-      const stats = await fs.stat(filePath);
-      if (stats.size !== file.buffer.length) {
-        this.logger.error(`File verification failed for ${fileName}`);
-        await this.deleteFile(fileName);
-        throw new Error('File verification failed');
+        // Verify the file was written correctly
+        const stats = await fs.stat(filePath);
+        if (stats.size !== file.buffer.length) {
+          this.logger.error(`File verification failed for ${fileName}`);
+          await this.deleteFile(fileName);
+          throw new FileSystemException('File verification failed');
+        }
+      } catch (writeError) {
+        this.logger.error(`Failed to write file: ${writeError.message}`);
+        throw new FileSystemException('Failed to save file to disk');
       }
 
       const baseUrl = process.env.BASE_URL || 'https://legitcommunity.uz';
       return `${baseUrl}/upload/${fileName}`;
     } catch (error) {
-      this.logger.error(`Failed to save file: ${error.message}`, error.stack);
-      if (error.message === 'File verification failed') {
-        throw new InternalServerErrorException('Failed to save file: verification error');
+      if (error instanceof FileUploadException ||
+          error instanceof FileSizeLimitException ||
+          error instanceof FileTypeException ||
+          error instanceof FileSystemException) {
+        throw error;
       }
-      throw new InternalServerErrorException('Failed to save file');
+      
+      this.logger.error(`Unexpected error during file upload: ${error.message}`, error.stack);
+      throw new FileUploadException(
+        'Failed to process file upload',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
   private async validateFile(file: Express.Multer.File): Promise<void> {
-    if (!file || !file.buffer) {
-      throw new Error('No file provided');
+    if (!file.buffer) {
+      throw new FileUploadException('File content is missing');
     }
 
     if (file.size > this.maxFileSize) {
-      throw new Error(`File size exceeds ${this.maxFileSize / 1024 / 1024}MB limit`);
+      throw new FileSizeLimitException(this.maxFileSize);
     }
 
     const extension = path.extname(file.originalname).toLowerCase();
     if (!this.allowedExtensions.includes(extension)) {
-      throw new Error(`Invalid file type. Allowed types: ${this.allowedExtensions.join(', ')}`);
+      throw new FileTypeException(this.allowedExtensions);
     }
 
     if (!file.mimetype.startsWith('image/')) {
-      throw new Error('Invalid file type: file must be an image');
+      throw new FileTypeException(['image/jpeg', 'image/png', 'image/gif']);
     }
   }
 
@@ -93,16 +116,21 @@ export class UploadService {
 
       const fullPath = path.join(this.uploadDir, fileName);
       
-      await fs.access(fullPath);
+      try {
+        await fs.access(fullPath);
+      } catch {
+        throw new FileNotFoundException(fileName);
+      }
+
       await fs.unlink(fullPath);
       this.logger.log(`File deleted: ${fileName}`);
     } catch (error) {
-      if (error.code === 'ENOENT') {
-        this.logger.warn('File not found during deletion:', filePath);
-        return;
+      if (error instanceof FileNotFoundException) {
+        throw error;
       }
+      
       this.logger.error('Failed to delete file:', error);
-      throw new InternalServerErrorException('Failed to delete file');
+      throw new FileSystemException('Failed to delete file');
     }
   }
 
@@ -112,16 +140,22 @@ export class UploadService {
       const now = Date.now();
 
       for (const file of files) {
-        const filePath = path.join(this.uploadDir, file);
-        const stats = await fs.stat(filePath);
+        try {
+          const filePath = path.join(this.uploadDir, file);
+          const stats = await fs.stat(filePath);
 
-        if (now - stats.mtime.getTime() > maxAge) {
-          await this.deleteFile(file);
-          this.logger.log(`Cleaned up old file: ${file}`);
+          if (now - stats.mtime.getTime() > maxAge) {
+            await this.deleteFile(file);
+            this.logger.log(`Cleaned up old file: ${file}`);
+          }
+        } catch (error) {
+          // Log but continue with other files
+          this.logger.error(`Failed to process file during cleanup: ${file}`, error);
         }
       }
     } catch (error) {
       this.logger.error('Failed to cleanup old files:', error);
+      // Don't throw as this is a background task
     }
   }
 }

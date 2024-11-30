@@ -40,6 +40,7 @@ import { diskStorage } from 'multer';
 import { v4 } from 'uuid';
 import * as path from 'node:path';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
     StatusModule,
     TasksModule,
     SubscriptionModule,
+    TelegramModule,
   ],
   controllers: [
     AuthController,

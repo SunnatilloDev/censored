@@ -1,44 +1,55 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
-import * as express from 'express';
-import * as process from 'node:process';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ValidationPipe, Logger } from '@nestjs/common';
+import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
+import * as compression from 'compression';
+import helmet from 'helmet';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // Swagger Configuration
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('CryptoArticle API')
-    .setDescription('API documentation for CryptoArticle')
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-      },
-      'access-token',
-    )
-    .build();
-
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
-
-  // Enable CORS
+  // Security
+  app.use(helmet());
+  app.use(compression());
   app.enableCors({
-    origin: ['https://cripta-valuta.vercel.app', 'http://localhost:8000'],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    origin: process.env.CORS_ORIGIN || '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
 
-  // Global Middleware
-  app.useGlobalPipes(new ValidationPipe());
-  app.use('/upload', express.static('uploads')); // Serve static files from the 'uploads' directory
+  // Global pipes and filters
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+      errorHttpStatusCode: 422,
+    }),
+  );
+  app.useGlobalFilters(new HttpExceptionFilter());
 
-  await app.listen(process.env.PORT || 8080);
-  console.log('Application is running on:', await app.getUrl());
+  // Swagger documentation
+  const config = new DocumentBuilder()
+    .setTitle('Crypto Article API')
+    .setDescription('API for managing crypto-related articles and user subscriptions')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
+  // Start server
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Swagger documentation available at: http://localhost:${port}/api`);
 }
 
 bootstrap();

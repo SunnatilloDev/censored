@@ -6,6 +6,11 @@ import { diskStorage } from 'multer';
 import { v4 } from 'uuid';
 import * as path from 'path';
 import * as fs from 'fs';
+import {
+  FileUploadException,
+  FileSizeLimitException,
+  FileTypeException,
+} from '../common/exceptions/custom.exceptions';
 
 @Module({
   imports: [
@@ -13,27 +18,35 @@ import * as fs from 'fs';
       storage: diskStorage({
         destination: (req, file, cb) => {
           const uploadPath = './uploads';
-          // Ensure directory exists
-          if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
+          try {
+            if (!fs.existsSync(uploadPath)) {
+              fs.mkdirSync(uploadPath, { recursive: true });
+            }
+            cb(null, uploadPath);
+          } catch (error) {
+            cb(new FileUploadException('Failed to access upload directory'), null);
           }
-          cb(null, uploadPath);
         },
         filename: (req, file, cb) => {
-          const uniqueName = v4();
-          const extension = path.extname(file.originalname).toLowerCase();
-          cb(null, `${uniqueName}${extension}`);
+          try {
+            const uniqueName = v4();
+            const extension = path.extname(file.originalname).toLowerCase();
+            cb(null, `${uniqueName}${extension}`);
+          } catch (error) {
+            cb(new FileUploadException('Failed to generate filename'), null);
+          }
         },
       }),
       fileFilter: (req, file, cb) => {
-        // Check if file is an image
-        if (!file.mimetype.startsWith('image/')) {
-          return cb(new Error('Only image files are allowed'), false);
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/gif'];
+        if (!allowedMimes.includes(file.mimetype)) {
+          return cb(new FileTypeException(allowedMimes), false);
         }
         cb(null, true);
       },
       limits: {
         fileSize: 5 * 1024 * 1024, // 5MB
+        files: 1,
       },
     }),
   ],
