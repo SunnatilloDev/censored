@@ -13,17 +13,33 @@ export class SubscriptionService {
   private readonly logger = new Logger(SubscriptionService.name);
   private readonly botToken: string;
   private readonly chatId: string;
+  private readonly isProduction: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
-    this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
-    this.chatId = this.configService.get<string>('TELEGRAM_CHAT_ID');
+    this.botToken = this.configService.get<string>('telegram.botToken');
+    this.chatId = this.configService.get<string>('telegram.chatId');
+    this.isProduction = this.configService.get<string>('server.env') === 'production';
+
+    if (this.isProduction && (!this.botToken || !this.chatId)) {
+      throw new Error('Telegram credentials are required in production mode');
+    }
+
+    if (!this.botToken || !this.chatId) {
+      this.logger.warn('Telegram credentials not configured - subscription checks will be skipped');
+    }
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
   async checkAllSubscriptions() {
+    // Skip subscription check if Telegram is not configured
+    if (!this.botToken || !this.chatId) {
+      this.logger.debug('Skipping subscription check - Telegram not configured');
+      return;
+    }
+
     this.logger.log('Starting subscription check for all users...');
 
     try {

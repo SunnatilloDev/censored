@@ -3,7 +3,9 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
 import * as Joi from 'joi';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+
 dotenv.config();
+
 // Load .env file immediately
 const envPath = path.resolve(process.cwd(), '.env');
 const result = dotenv.config({ path: envPath });
@@ -35,8 +37,18 @@ logger.debug('Environment loaded:', {
         NODE_ENV: Joi.string()
           .valid('development', 'production', 'test')
           .default('development'),
-        TELEGRAM_BOT_TOKEN: Joi.string().required(),
-        TELEGRAM_CHAT_ID: Joi.string().required(),
+        TELEGRAM_BOT_TOKEN: Joi.string()
+          .when('NODE_ENV', {
+            is: 'production',
+            then: Joi.required(),
+            otherwise: Joi.optional()
+          }),
+        TELEGRAM_CHAT_ID: Joi.string()
+          .when('NODE_ENV', {
+            is: 'production',
+            then: Joi.required(),
+            otherwise: Joi.optional()
+          }),
       }),
       validationOptions: {
         abortEarly: true,
@@ -48,12 +60,12 @@ logger.debug('Environment loaded:', {
             url: process.env.DATABASE_URL,
           },
           telegram: {
-            botToken: process.env.TELEGRAM_BOT_TOKEN,
-            chatId: process.env.TELEGRAM_CHAT_ID,
+            botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+            chatId: process.env.TELEGRAM_CHAT_ID || '',
           },
           server: {
             port: parseInt(process.env.PORT || '3000', 10),
-            env: process.env.NODE_ENV,
+            env: process.env.NODE_ENV || 'development',
           },
         }),
       ],
