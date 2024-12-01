@@ -20,74 +20,55 @@ export class ArticlesService {
 
   constructor(private prisma: PrismaService) {}
 
-  // Get all articles with pagination and caching
-  async getAllArticles(page = 1, limit = 10) {
+  // Get all articles
+  async getAllArticles() {
     try {
-      const skip = (page - 1) * limit;
-      const [articles, total] = await Promise.all([
-        this.prisma.article.findMany({
-          where: {
-            status: ArticleStatus.PUBLISHED,
-            isActive: false,
-          },
-          include: {
-            ArticleRating: true,
-            author: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                photo_url: true,
-                isBlocked: true,
-              },
-            },
-            ArticleTag: {
-              include: {
-                tag: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            categories: {
-              include: {
-                category: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: [
-            { isEditorChoice: 'desc' },
-            { avgRating: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          skip,
-          take: limit,
-        }),
-        this.prisma.article.count({
-          where: {
-            status: ArticleStatus.PUBLISHED,
-            isActive: false,
-          },
-        }),
-      ]);
-
-      return {
-        articles: articles.map((article) => transformArticleData(article)),
-        meta: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+      const articles = await this.prisma.article.findMany({
+        where: {
+          status: ArticleStatus.PUBLISHED,
+          isActive: false,
         },
-      };
+        include: {
+          ArticleRating: true,
+          author: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              photo_url: true,
+              isBlocked: true,
+            },
+          },
+          ArticleTag: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          categories: {
+            include: {
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [
+          { isEditorChoice: 'desc' },
+          { avgRating: 'desc' },
+          { createdAt: 'desc' },
+        ],
+      });
+
+      return articles.map((article) => transformArticleData(article));
     } catch (err) {
       console.error('Error in getAllArticles:', err);
       throw new InternalServerErrorException('Failed to fetch articles');
