@@ -72,22 +72,28 @@ export class SubscriptionService {
 
       for (const user of users) {
         try {
+          this.logger.debug(`Checking subscription for user ${user.username || user.id}`);
           const isSubscribed = await this.checkTelegramSubscription(user.telegramId);
+          this.logger.debug(`User ${user.username || user.id} subscription status: ${isSubscribed}, current DB status: ${user.isSubscribed}`);
           
           // Only update if subscription status has changed
           if (isSubscribed !== user.isSubscribed) {
-            await this.prisma.user.update({
+            this.logger.debug(`Updating subscription status for user ${user.username || user.id} from ${user.isSubscribed} to ${isSubscribed}`);
+            
+            const updatedUser = await this.prisma.user.update({
               where: { id: user.id },
               data: { isSubscribed }
             }).catch(error => {
+              this.logger.error(`Failed to update user ${user.id}: ${error.message}`);
               throw new DatabaseException(`Failed to update user ${user.id}: ${error.message}`);
             });
 
             this.logger.log(
-              `Updated subscription status for user ${user.username || user.id}: ${isSubscribed}`
+              `Successfully updated subscription status for user ${user.username || user.id}: ${isSubscribed}, DB status now: ${updatedUser.isSubscribed}`
             );
             results.success++;
           } else {
+            this.logger.debug(`No change needed for user ${user.username || user.id}, status remains: ${user.isSubscribed}`);
             results.unchanged++;
           }
         } catch (error) {
@@ -117,6 +123,7 @@ export class SubscriptionService {
     }
 
     try {
+      this.logger.debug(`Making Telegram API request for user ${telegramId}`);
       const response = await axios.post(
         `https://api.telegram.org/bot${this.botToken}/getChatMember`,
         {
@@ -132,23 +139,31 @@ export class SubscriptionService {
       );
 
       if (!response.data?.ok) {
+        this.logger.warn(`Telegram API returned not OK status for user ${telegramId}`);
         throw new TelegramAPIException('Telegram API returned not OK status');
       }
 
       const { status } = response.data.result;
-      return ['creator', 'administrator', 'member'].includes(status);
+      this.logger.debug(`Telegram API returned status "${status}" for user ${telegramId}`);
+      const isSubscribed = ['creator', 'administrator', 'member'].includes(status);
+      this.logger.debug(`User ${telegramId} subscription status determined as: ${isSubscribed}`);
+      return isSubscribed;
     } catch (error) {
       if (error instanceof AxiosError) {
         if (error.code === 'ECONNABORTED') {
+          this.logger.error(`Telegram API timeout for user ${telegramId}`);
           throw new TelegramAPIException('Telegram API timeout');
         }
         if (error.response?.status === 429) {
+          this.logger.error(`Rate limit exceeded for user ${telegramId}`);
           throw new TelegramAPIException('Rate limit exceeded');
         }
         const apiError = error.response?.data?.description || error.message;
+        this.logger.error(`Telegram API error for user ${telegramId}: ${apiError}`);
         throw new TelegramAPIException(`Telegram API error: ${apiError}`);
       }
       
+      this.logger.error(`Failed to verify subscription for user ${telegramId}: ${error.message}`);
       throw new TelegramAPIException(
         `Failed to verify subscription: ${error.message}`
       );
