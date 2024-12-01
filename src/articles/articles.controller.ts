@@ -50,8 +50,16 @@ export class ArticlesController {
   @ApiOperation({ summary: 'Retrieve all articles' })
   @ApiResponse({ status: 200, description: 'List of all articles.' })
   @ApiResponse({ status: 500, description: 'Failed to retrieve articles.' })
-  async getAllArticles(@Body() userId?: number) {
-    return await this.articleService.getAllArticles(userId);
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    type: 'number',
+    description: 'Optional user ID to check permissions',
+  })
+  async getAllArticles(@Query('userId') userId?: string) {
+    return await this.articleService.getAllArticles(
+      userId ? Number(userId) : undefined,
+    );
   }
 
   @Get('search')
