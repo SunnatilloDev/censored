@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -8,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateArticleDto, UpdateArticleDto } from './dto';
 import transformArticleData from 'src/articles/utils/rowToNiceStructure';
 import { ArticleStatus } from '@prisma/client'; // Import the enum
+import { Role } from '@prisma/client'; // Import the enum
 
 @Injectable()
 export class ArticlesService {
@@ -21,13 +23,31 @@ export class ArticlesService {
   constructor(private prisma: PrismaService) {}
 
   // Get all articles
-  async getAllArticles() {
+  async getAllArticles(userId?: number) {
     try {
+      // First get the user's role if userId is provided
+      let userRole = null;
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { role: true },
+        });
+        userRole = user?.role;
+      }
+
+      // Build the where clause based on user role
+      const whereClause = {
+        isActive: true,
+        ...(!userRole ||
+        (userRole !== Role.OWNER &&
+          userRole !== Role.ADMIN &&
+          userRole !== Role.MODERATOR)
+          ? { status: ArticleStatus.PUBLISHED }
+          : {}), // No status filter for privileged users
+      };
+
       const articles = await this.prisma.article.findMany({
-        where: {
-          status: ArticleStatus.PUBLISHED,
-          isActive: true,
-        },
+        where: whereClause,
         include: {
           ArticleRating: true,
           author: {
@@ -409,6 +429,16 @@ export class ArticlesService {
       const id = parseInt(articleId);
       if (isNaN(id)) throw new BadRequestException('Invalid article ID');
 
+      // First get the user's role if userId is provided
+      let userRole = null;
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { role: true },
+        });
+        userRole = user?.role;
+      }
+
       // Fetch the article along with categories, author, and ratings
       const article = await this.prisma.article.findUnique({
         where: { id },
@@ -422,6 +452,17 @@ export class ArticlesService {
 
       if (!article) {
         throw new NotFoundException(`Article with ID ${articleId} not found.`);
+      }
+
+      // Check if article is published or user has special role
+      if (
+        article.status !== ArticleStatus.PUBLISHED &&
+        (!userRole ||
+          (userRole !== Role.OWNER &&
+            userRole !== Role.ADMIN &&
+            userRole !== Role.MODERATOR))
+      ) {
+        throw new ForbiddenException('This article is not published');
       }
 
       console.log('Article fetched:', article);
@@ -450,6 +491,9 @@ export class ArticlesService {
       };
     } catch (error) {
       console.error('Error in getArticle:', error);
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
       throw new InternalServerErrorException('Failed to retrieve article.');
     }
   }
