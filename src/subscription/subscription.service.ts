@@ -52,10 +52,12 @@ export class SubscriptionService {
       const users = await this.prisma.user
         .findMany({
           where: {
-            AND: [
-              { telegramId: { not: '' } }, // Exclude empty strings
-              { telegramId: { not: null } }, // Exclude null values
-            ],
+            NOT: {
+              OR: [
+                { telegramId: null },
+                { telegramId: '' }
+              ]
+            }
           },
           select: {
             id: true,
