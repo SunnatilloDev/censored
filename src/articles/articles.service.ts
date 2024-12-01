@@ -26,7 +26,7 @@ export class ArticlesService {
       const articles = await this.prisma.article.findMany({
         where: {
           status: ArticleStatus.PUBLISHED,
-          isActive: false,
+          isActive: true,
         },
         include: {
           ArticleRating: true,
