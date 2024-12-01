@@ -21,14 +21,17 @@ export class SubscriptionService {
   ) {
     this.botToken = this.configService.get<string>('telegram.botToken');
     this.chatId = this.configService.get<string>('telegram.chatId');
-    this.isProduction = this.configService.get<string>('server.env') === 'production';
+    this.isProduction =
+      this.configService.get<string>('server.env') === 'production';
 
     if (this.isProduction && (!this.botToken || !this.chatId)) {
       throw new Error('Telegram credentials are required in production mode');
     }
 
     if (!this.botToken || !this.chatId) {
-      this.logger.warn('Telegram credentials not configured - subscription checks will be skipped');
+      this.logger.warn(
+        'Telegram credentials not configured - subscription checks will be skipped',
+      );
     }
   }
 
@@ -36,7 +39,9 @@ export class SubscriptionService {
   async checkAllSubscriptions() {
     // Skip subscription check if Telegram is not configured
     if (!this.botToken || !this.chatId) {
-      this.logger.debug('Skipping subscription check - Telegram not configured');
+      this.logger.debug(
+        'Skipping subscription check - Telegram not configured',
+      );
       return;
     }
 
@@ -44,22 +49,26 @@ export class SubscriptionService {
 
     try {
       // Get all users with telegramId
-      const users = await this.prisma.user.findMany({
-        where: {
-          AND: [
-            { telegramId: { not: '' } },  // Exclude empty strings
-            { telegramId: { not: null } } // Exclude null values
-          ]
-        },
-        select: {
-          id: true,
-          telegramId: true,
-          isSubscribed: true,
-          username: true  // For better logging
-        }
-      }).catch(error => {
-        throw new DatabaseException(`Failed to fetch users: ${error.message}`);
-      });
+      const users = await this.prisma.user
+        .findMany({
+          where: {
+            AND: [
+              { telegramId: { not: '' } }, // Exclude empty strings
+              { telegramId: { not: null } }, // Exclude null values
+            ],
+          },
+          select: {
+            id: true,
+            telegramId: true,
+            isSubscribed: true,
+            username: true, // For better logging
+          },
+        })
+        .catch((error) => {
+          throw new DatabaseException(
+            `Failed to fetch users: ${error.message}`,
+          );
+        });
 
       this.logger.log(`Found ${users.length} users to check`);
 
@@ -67,33 +76,49 @@ export class SubscriptionService {
         success: 0,
         failed: 0,
         unchanged: 0,
-        errors: [] as string[]
+        errors: [] as string[],
       };
 
       for (const user of users) {
         try {
-          this.logger.debug(`Checking subscription for user ${user.username || user.id}`);
-          const isSubscribed = await this.checkTelegramSubscription(user.telegramId);
-          this.logger.debug(`User ${user.username || user.id} subscription status: ${isSubscribed}, current DB status: ${user.isSubscribed}`);
-          
+          this.logger.debug(
+            `Checking subscription for user ${user.username || user.id}`,
+          );
+          const isSubscribed = await this.checkTelegramSubscription(
+            user.telegramId,
+          );
+          this.logger.debug(
+            `User ${user.username || user.id} subscription status: ${isSubscribed}, current DB status: ${user.isSubscribed}`,
+          );
+
           // Only update if subscription status has changed
           if (isSubscribed !== user.isSubscribed) {
-            this.logger.debug(`Updating subscription status for user ${user.username || user.id} from ${user.isSubscribed} to ${isSubscribed}`);
-            
-            const updatedUser = await this.prisma.user.update({
-              where: { id: user.id },
-              data: { isSubscribed }
-            }).catch(error => {
-              this.logger.error(`Failed to update user ${user.id}: ${error.message}`);
-              throw new DatabaseException(`Failed to update user ${user.id}: ${error.message}`);
-            });
+            this.logger.debug(
+              `Updating subscription status for user ${user.username || user.id} from ${user.isSubscribed} to ${isSubscribed}`,
+            );
+
+            const updatedUser = await this.prisma.user
+              .update({
+                where: { id: user.id },
+                data: { isSubscribed },
+              })
+              .catch((error) => {
+                this.logger.error(
+                  `Failed to update user ${user.id}: ${error.message}`,
+                );
+                throw new DatabaseException(
+                  `Failed to update user ${user.id}: ${error.message}`,
+                );
+              });
 
             this.logger.log(
-              `Successfully updated subscription status for user ${user.username || user.id}: ${isSubscribed}, DB status now: ${updatedUser.isSubscribed}`
+              `Successfully updated subscription status for user ${user.username || user.id}: ${isSubscribed}, DB status now: ${updatedUser.isSubscribed}`,
             );
             results.success++;
           } else {
-            this.logger.debug(`No change needed for user ${user.username || user.id}, status remains: ${user.isSubscribed}`);
+            this.logger.debug(
+              `No change needed for user ${user.username || user.id}, status remains: ${user.isSubscribed}`,
+            );
             results.unchanged++;
           }
         } catch (error) {
@@ -108,15 +133,29 @@ export class SubscriptionService {
       this.logger.log('Subscription check summary:', {
         total: users.length,
         ...results,
-        errors: results.errors.length ? `${results.errors.length} errors occurred` : 'No errors'
+        errors: results.errors.length
+          ? `${results.errors.length} errors occurred`
+          : 'No errors',
+      });
+      console.log('Subscription check summary:', {
+        total: users.length,
+        ...results,
+        errors: results.errors.length
+          ? `${results.errors.length} errors occurred`
+          : 'No errors',
       });
     } catch (error) {
-      this.logger.error('Critical error in subscription check cron job:', error);
+      this.logger.error(
+        'Critical error in subscription check cron job:',
+        error,
+      );
       throw error; // Let the global exception filter handle it
     }
   }
 
-  private async checkTelegramSubscription(telegramId: string): Promise<boolean> {
+  private async checkTelegramSubscription(
+    telegramId: string,
+  ): Promise<boolean> {
     if (!telegramId || !this.botToken || !this.chatId) {
       this.logger.warn('Missing required Telegram configuration');
       return false;
@@ -133,20 +172,28 @@ export class SubscriptionService {
         {
           timeout: 5000, // 5 second timeout
           headers: {
-            'Content-Type': 'application/json'
-          }
-        }
+            'Content-Type': 'application/json',
+          },
+        },
       );
 
       if (!response.data?.ok) {
-        this.logger.warn(`Telegram API returned not OK status for user ${telegramId}`);
+        this.logger.warn(
+          `Telegram API returned not OK status for user ${telegramId}`,
+        );
         throw new TelegramAPIException('Telegram API returned not OK status');
       }
 
       const { status } = response.data.result;
-      this.logger.debug(`Telegram API returned status "${status}" for user ${telegramId}`);
-      const isSubscribed = ['creator', 'administrator', 'member'].includes(status);
-      this.logger.debug(`User ${telegramId} subscription status determined as: ${isSubscribed}`);
+      this.logger.debug(
+        `Telegram API returned status "${status}" for user ${telegramId}`,
+      );
+      const isSubscribed = ['creator', 'administrator', 'member'].includes(
+        status,
+      );
+      this.logger.debug(
+        `User ${telegramId} subscription status determined as: ${isSubscribed}`,
+      );
       return isSubscribed;
     } catch (error) {
       if (error instanceof AxiosError) {
@@ -159,13 +206,17 @@ export class SubscriptionService {
           throw new TelegramAPIException('Rate limit exceeded');
         }
         const apiError = error.response?.data?.description || error.message;
-        this.logger.error(`Telegram API error for user ${telegramId}: ${apiError}`);
+        this.logger.error(
+          `Telegram API error for user ${telegramId}: ${apiError}`,
+        );
         throw new TelegramAPIException(`Telegram API error: ${apiError}`);
       }
-      
-      this.logger.error(`Failed to verify subscription for user ${telegramId}: ${error.message}`);
+
+      this.logger.error(
+        `Failed to verify subscription for user ${telegramId}: ${error.message}`,
+      );
       throw new TelegramAPIException(
-        `Failed to verify subscription: ${error.message}`
+        `Failed to verify subscription: ${error.message}`,
       );
     }
   }

@@ -68,7 +68,7 @@ export class BotService implements OnModuleInit {
         if (!isSubscribed) {
           await this.sendMessage(
             user.telegramId,
-            'You have left the channel. Please rejoin to continue using our services: https://t.me/YourChannelLink',
+            `You have left the channel. Please rejoin to continue using our services: ${process.env.TELEGRAM_CHANNEL_ID}`,
           );
         }
       }
