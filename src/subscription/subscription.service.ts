@@ -53,7 +53,7 @@ export class SubscriptionService {
         .findMany({
           where: {
             telegramId: {
-              not: null,
+              not: '',
             },
           },
           select: {
