@@ -50,8 +50,8 @@ export class ArticlesController {
   @ApiOperation({ summary: 'Retrieve all articles' })
   @ApiResponse({ status: 200, description: 'List of all articles.' })
   @ApiResponse({ status: 500, description: 'Failed to retrieve articles.' })
-  async getAllArticles() {
-    return await this.articleService.getAllArticles();
+  async getAllArticles(@Body() userId?: number) {
+    return await this.articleService.getAllArticles(userId);
   }
 
   @Get('search')
