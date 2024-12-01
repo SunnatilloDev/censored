@@ -63,16 +63,23 @@ export class ArticlesController {
   }
 
   @Get('search')
-  @ApiOperation({ summary: 'Search articles by keyword' })
-  @ApiQuery({
-    name: 'query',
-    type: String,
-    required: true,
-    description: 'Search keyword',
-  })
-  @ApiResponse({ status: 200, description: 'Search results for articles.' })
-  async searchArticles(@Query('query') query: string) {
-    return this.articleService.searchArticles(query);
+  @ApiOperation({ summary: 'Search articles' })
+  @ApiQuery({ name: 'query', required: true, type: 'string' })
+  @ApiQuery({ name: 'page', required: false, type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number' })
+  @ApiQuery({ name: 'userId', required: false, type: 'number', description: 'Optional user ID to check permissions' })
+  async searchArticles(
+    @Query('query') query: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.articleService.searchArticles(
+      query,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 10,
+      userId ? parseInt(userId) : undefined,
+    );
   }
 
   @Get('top')

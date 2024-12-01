@@ -25,6 +25,8 @@ export class ArticlesService {
   // Get all articles
   async getAllArticles(userId?: number) {
     try {
+      console.log('getAllArticles called with userId:', userId);
+
       // First get the user's role if userId is provided
       let userRole = null;
       if (userId) {
@@ -32,6 +34,7 @@ export class ArticlesService {
           where: { id: userId },
           select: { role: true },
         });
+        console.log('Found user with role:', user?.role);
         userRole = user?.role;
       }
 
@@ -45,6 +48,8 @@ export class ArticlesService {
           ? { status: ArticleStatus.PUBLISHED }
           : {}), // No status filter for privileged users
       };
+
+      console.log('Using where clause:', whereClause);
 
       const articles = await this.prisma.article.findMany({
         where: whereClause,
@@ -88,9 +93,16 @@ export class ArticlesService {
         ],
       });
 
+      console.log('Found articles count:', articles.length);
       return articles.map((article) => transformArticleData(article));
     } catch (err) {
       console.error('Error in getAllArticles:', err);
+      // Add more detailed error information
+      if (err instanceof Error) {
+        throw new InternalServerErrorException(
+          `Failed to fetch articles: ${err.message}`,
+        );
+      }
       throw new InternalServerErrorException('Failed to fetch articles');
     }
   }
@@ -284,51 +296,100 @@ export class ArticlesService {
     return article;
   }
 
-  async searchArticles(query: string, page = 1, limit = 10) {
+    /**
+     * Searches for articles based on a given query and pagination parameters.
+     * 
+     * @param query - The search string to match against articles.
+     * @param page - The page number for pagination (default is 1).
+     * @param limit - The number of articles to return per page (default is 10).
+     * @param userId - Optional user ID to filter articles based on user role.
+     * @throws BadRequestException if the search query is empty.
+     * @throws InternalServerErrorException if the search operation fails.
+     * @returns An object containing the list of articles and pagination metadata.
+     */
+  async searchArticles(query: string, page = 1, limit = 10, userId?: number) {
     try {
       if (!query || query.trim().length === 0) {
         throw new BadRequestException('Search query cannot be empty');
       }
 
+      // First get the user's role if userId is provided
+      let userRole = null;
+      if (userId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { role: true },
+        });
+        userRole = user?.role;
+      }
+
       const skip = (page - 1) * limit;
       const searchQuery = query.trim();
 
-      const [articles, total] = await Promise.all([
-        this.prisma.article.findMany({
-          where: {
-            AND: [
-              { status: ArticleStatus.PUBLISHED },
-              { isActive: true },
+      // Build the where clause based on user role
+      const whereClause = {
+        AND: [
+          { isActive: true },
+          ...(!userRole ||
+          (userRole !== Role.OWNER &&
+            userRole !== Role.ADMIN &&
+            userRole !== Role.MODERATOR)
+            ? [{ status: ArticleStatus.PUBLISHED }]
+            : []),
+          {
+            OR: [
               {
-                OR: [
-                  { title: { contains: searchQuery, mode: 'insensitive' } },
-                  { subtitle: { contains: searchQuery, mode: 'insensitive' } },
-                  {
-                    conclusion: { contains: searchQuery, mode: 'insensitive' },
-                  },
-                  {
-                    ArticleTag: {
-                      some: {
-                        tag: {
-                          name: { contains: searchQuery, mode: 'insensitive' },
-                        },
+                title: {
+                  contains: searchQuery,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                subtitle: {
+                  contains: searchQuery,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                conclusion: {
+                  contains: searchQuery,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                ArticleTag: {
+                  some: {
+                    tag: {
+                      name: {
+                        contains: searchQuery,
+                        mode: 'insensitive' as const,
                       },
                     },
                   },
-                  {
-                    categories: {
-                      some: {
-                        category: {
-                          name: { contains: searchQuery, mode: 'insensitive' },
-                        },
+                },
+              },
+              {
+                categories: {
+                  some: {
+                    category: {
+                      name: {
+                        contains: searchQuery,
+                        mode: 'insensitive' as const,
                       },
                     },
                   },
-                ],
+                },
               },
             ],
           },
+        ],
+      };
+
+      const [articles, total] = await Promise.all([
+        this.prisma.article.findMany({
+          where: whereClause,
           include: {
+            ArticleRating: true,
             ArticleTag: {
               include: {
                 tag: {
@@ -369,39 +430,7 @@ export class ArticlesService {
           take: limit,
         }),
         this.prisma.article.count({
-          where: {
-            AND: [
-              { status: ArticleStatus.PUBLISHED },
-              { isActive: true },
-              {
-                OR: [
-                  { title: { contains: searchQuery, mode: 'insensitive' } },
-                  { subtitle: { contains: searchQuery, mode: 'insensitive' } },
-                  {
-                    conclusion: { contains: searchQuery, mode: 'insensitive' },
-                  },
-                  {
-                    ArticleTag: {
-                      some: {
-                        tag: {
-                          name: { contains: searchQuery, mode: 'insensitive' },
-                        },
-                      },
-                    },
-                  },
-                  {
-                    categories: {
-                      some: {
-                        category: {
-                          name: { contains: searchQuery, mode: 'insensitive' },
-                        },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
+          where: whereClause,
         }),
       ]);
 
