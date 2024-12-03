@@ -257,4 +257,18 @@ export class ArticlesController {
   async publishArticle(@Param('id') articleId: string) {
     return await this.articleService.publishArticle(+articleId);
   }
+
+  @Get('user/:authorId')
+  @ApiOperation({ summary: 'Get articles by user' })
+  @ApiParam({ name: 'authorId', description: 'ID of the article author' })
+  @ApiQuery({ name: 'viewerId', required: false, description: 'ID of the user viewing the articles' })
+  async getUserArticles(
+    @Param('authorId') authorId: string,
+    @Query('viewerId') viewerId?: string,
+  ) {
+    return await this.articleService.getUserArticles(
+      Number(authorId),
+      viewerId ? Number(viewerId) : undefined,
+    );
+  }
 }

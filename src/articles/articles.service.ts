@@ -107,6 +107,70 @@ export class ArticlesService {
     }
   }
 
+  // Get user articles - shows all articles for profile owner, only published for others
+  async getUserArticles(authorId: number, viewerId?: number) {
+    try {
+      // Build the where clause based on whether viewer is the author
+      const whereClause = {
+        authorId,
+        isActive: true,
+        ...(authorId !== viewerId ? { status: ArticleStatus.PUBLISHED } : {}),
+      };
+
+      const articles = await this.prisma.article.findMany({
+        where: whereClause,
+        include: {
+          ArticleRating: true,
+          author: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              photo_url: true,
+              isBlocked: true,
+            },
+          },
+          ArticleTag: {
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          categories: {
+            include: {
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [
+          { isEditorChoice: 'desc' },
+          { avgRating: 'desc' },
+          { createdAt: 'desc' },
+        ],
+      });
+
+      return articles.map((article) => transformArticleData(article));
+    } catch (err) {
+      console.error('Error in getUserArticles:', err);
+      if (err instanceof Error) {
+        throw new InternalServerErrorException(
+          `Failed to fetch user articles: ${err.message}`,
+        );
+      }
+      throw new InternalServerErrorException('Failed to fetch user articles');
+    }
+  }
+
   // Increment article views with rate limiting
   async incrementArticleViews(articleId: number, userId?: number) {
     if (!userId) return;
