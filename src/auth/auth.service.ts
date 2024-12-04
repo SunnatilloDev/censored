@@ -120,9 +120,6 @@ export class AuthService {
         where: { telegramId },
         update: {
           username,
-          firstName,
-          lastName,
-          photo_url,
           isSubscribed: true,
           lastOnline: new Date(),
         },
