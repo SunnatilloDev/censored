@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsEnum } from 'class-validator';
+import { Role } from '../enums/role.enum'; 
 
 export class CreateUserDto {
   id?: number;
@@ -58,6 +59,11 @@ export class UpdateUserDto {
   @IsString()
   @IsOptional()
   about?: string; // New field for "about you" information
+
+  @ApiProperty({ enum: Role })
+  @IsEnum(Role)
+  @IsOptional()
+  role?: Role;
 
   @ApiProperty()
   @IsBoolean()
